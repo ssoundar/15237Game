@@ -1,12 +1,23 @@
 <html>
 <head>
-   <script src="http://code.jquery.com/jquery-1.8.2.min.js"></script>
+   <meta name="viewport" content="width=device-width, user-scalable=no">
+   <meta name="apple-mobile-web-app-capable" content="yes">
+   <script src='//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js'></script>
    <!-- CHAGNETHIS: Address to server !-->
    <script src="http://76.125.178.2:3000/socket.io/socket.io.js"></script>
+   <script src="Util.js"></script>
+   <script src="ScaledPage.js"></script>
+   <script src="game.js"></script>
+   <script src="addTappableJQPlugin.js"></script>
+   <link href="game.css" rel="stylesheet" type="text/css">
+   <link href="choosePlayer.css" rel="stylesheet" type="text/css">
+   <title> 15237 Game </title>
 </head>
 <body>
-   Game!
-   <div id = "add"></div>
-   <script src="game.js"></script>
+    <h2 id="message">Pick a Character</h2>   
+    <button onclick="setUserID('blue')" id="blueButton" class="button">Blue Player</a>
+    <button onclick="setUserID('black')" id="blackButton" class="button">Black Player</a>
+    <button onclick="resetUsers()" id="resetButton" class="button">Reassign Players</a>
+    <script src="choosePlayer.js"></script>
 </body>
 </html>

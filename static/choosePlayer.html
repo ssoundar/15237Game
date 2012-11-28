@@ -2,27 +2,15 @@
 <html>
 <head>
     <title>Choose Your Character</title>
-    <link rel="stylesheet" href="http://code.jquery.com/mobile/1.2.0/jquery.mobile-1.2.0.min.css" />
-    <script src="http://code.jquery.com/jquery-1.8.2.min.js"></script>
-    <script src="http://code.jquery.com/mobile/1.2.0/jquery.mobile-1.2.0.min.js"></script>
+    <script src='//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js'></script>
     <!-- CHAGNETHIS: Address to server !-->
     <script src="http://76.125.178.2:3000/socket.io/socket.io.js"></script>
-    
+    <link href="choosePlayer.css" rel="stylesheet" type="text/css">
 </head>
 <body>
-    <div data-role="page" data-title="Choose Character" id="home">
-	    <div data-role="header" data-position="fixed"><h1>Choose Character</h1></div>
-	    <div data-role="content">
-		    <p><strong>Pick a Character</strong></p>
-            <div class="ui-body ui-body-e">
-               <a href="game.html" data-role="button" data-theme="a" onclick="setUserID('black')" id="blackButton">Black Player</a>
-               <a href="game.html" data-role="button" data-theme="b" onclick="setUserID('blue')" id="blueButton">Blue Player</a>
-               <div id="popupdiv" class="ui-content" data-role="popup"></div>
-            </div>
-	    </div>
-	    <div data-role="footer" data-position="fixed">
-        </div>
-    </div>
+    <p><strong>Pick a Character</strong></p>
+    <a href="game.html" onclick="setUserID('black')" id="blackButton" class="button">Black Player</a>
+    <a href="game.html" onclick="setUserID('blue')" id="blueButton" class="button">Blue Player</a>
     <script src="choosePlayer.js"></script>
 </body>
 </html>

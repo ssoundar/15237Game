@@ -11,23 +11,25 @@ $(document).ready(function() {
        if(data.indexOf('blue') >= 0){
           $("#blueButton").hide();
        }
-       if(data.length >=2){
-          $( "#popupdiv" ).html("No More Player Slots");
-          $( "#popupdiv" ).popup();
-          $( "#popupdiv" ).popup("open");
-
-          window.setTimeout(function(){
-            $( "#popupdiv" ).popup("close");
-          },2000);
+       if(data.length >= 2 && data.indexOf('black') >= 0 && data.indexOf('blue') >= 0){
+          $("#resetButton").show();
+          $("#message").text("All Players Assigned, click to reassign players.");
        }
     });
  });
 function setUserID(playerType){
    if(playerType === 'black'){
-      window.playerType = 'black';
+      $('body').html("");
+      new Game(playerType);
    }
    if(playerType === 'blue'){
-      window.playerType = 'blue';
+      $('body').html("");
+      new Game(playerType);
    }
+}
+
+function resetUsers(){
+   socket.emit('updateAvailableCharacters', 'reset');
+   location.reload();
 }
 

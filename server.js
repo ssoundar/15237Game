@@ -83,9 +83,17 @@ io.sockets.on('connection', function(socket){
     });
     
     socket.on('updateAvailableCharacters', function(data) {
+       if(data === 'reset'){
+          var len = availableCharacters.length;
+          for(var i = 0; i < len; i++){
+            availableCharacters.pop();
+          }
+          availableCharacters = new Array();
+          return;
+       }
+       console.log("Data:" + data);
        if(availableCharacters.indexOf(data) < 0 && availableCharacters.length < 2){
           availableCharacters.push(data);
-          console.log(availableCharacters);
        }
     });
     
