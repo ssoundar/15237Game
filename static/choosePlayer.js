@@ -17,19 +17,14 @@ $(document).ready(function() {
        }
     });
  });
-function setUserID(playerType){
-   if(playerType === 'black'){
-      $('body').html("");
-      new Game(playerType);
-   }
-   if(playerType === 'blue'){
-      $('body').html("");
-      new Game(playerType);
-   }
+function setUserID(playerType, otherPlayer){
+   $('body').html("");
+   new Game(playerType, otherPlayer);
 }
 
 function resetUsers(){
    socket.emit('updateAvailableCharacters', 'reset');
    location.reload();
 }
+
 

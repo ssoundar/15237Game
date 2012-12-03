@@ -38,26 +38,26 @@ function addTappableJQPlugin(){
             startx = x;
             starty = y;
             potentialTap = true;
-            downCB(x,y, player);
+            downCB(x,y);
         }
 
         // cancel if the touch moves more than 10px (because it could be a potential scroll)
         var move = function(x, y){
             if (potentialTap){
-               moveCB(x,y, player);
+               moveCB(x,y);
             }
         }
 
         var exit = function(){
             if (potentialTap){
                 potentialTap = false;
-                upCB(player);
+                upCB();
             }
         }
 
         var up = function(){
             if (potentialTap){
-                upCB(player);
+                upCB();
                 tapCB();
                 potentialTap = false;
             }
@@ -73,14 +73,17 @@ function addTappableJQPlugin(){
                 down(x, y);
             });
             this.on('touchend', function(event){
+                event.preventDefault();
                 up();
             });
             // cancel on touchleave (finger moves out of object)
             this.on('touchleave', function(event){
+                event.preventDefault();
                 alert("Exit");
                 exit();
             });
             this.on('touchcancel', function(event){
+                event.preventDefault();
                 alert("Exit");
                 exit();
             });
