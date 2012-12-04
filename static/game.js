@@ -1,5 +1,6 @@
 //CHAGNETHIS: Address to server
 var address = 'http://76.125.178.2:3000/';
+//var address = 'http://128.237.228.203:3000/';
 var socket;
 
 //Page and Canvas Statics
@@ -11,12 +12,12 @@ var CONTROL_RADIUS = 50;
 var SCALE;
 
 //Player Statics
-var MAX_SPEED = 10;
-
+var MAXSPEED = 10;
+var MAG_EPSILON = 0.0001;
 //Weapon Statics
 var PISTOL = 0;
-var PISTOLBULLETSPEED = 25;
-var PISTOLSHOOTINGSPEED = 100;
+var PISTOLBULLETSPEED = 5;
+var PISTOLSHOOTINGSPEED = 300;
 
  /********
  * Game
@@ -36,8 +37,9 @@ Game.prototype.setup = function(){
    this.initCanvas();
    this.player = new Player(this.playerType, this.page);
    this.otherPlayer = new Player(this.otherPlayerType, this.page);
-   this.moveController = new MoveControl(this.page, this.player);
-   this.shootController = new ShootingControl(this.page, this.player);
+   socket.on('updateWithServerPosition', this.otherPlayer.updateWithServerLocation.bind(this.otherPlayer));
+   this.controller = new Control(this.page, this.player);
+   
    this.map = new Map(this.page, this.player);
    this.body.append($('<div id = "txtmsg">Hello</div>'));
 }
@@ -54,17 +56,32 @@ Game.prototype.initCanvas = function(){
     SCALE = this.canvas.width() / this.width;
     HEIGHT = this.canvas.height();
     WIDTH = this.canvas.width();
+    var canvasInfo = {
+         CANVASWIDTH : CANVASWIDTH,
+         CANVASHEIGHT: CANVASHEIGHT,
+    };
+    socket.emit('updateCanvasInfo', canvasInfo);
 };
 
 /*********
 * Drawing
 *********/
 Game.prototype.draw = function(timeDiff){
+    /*var stepInfo = {
+      timeDiff: timeDiff,
+      player: this.player.player
+    };
+    socket.emit('stepPlayerPosition',stepInfo);*/
+
     this.clearPage();
-    this.player.updateLocation(timeDiff);
     this.player.weapon.updateBulletsLocation(timeDiff);
+    this.player.updateLocation(timeDiff);
     this.player.draw();
     this.player.weapon.drawBullets();
+
+    
+    this.otherPlayer.draw();
+    this.otherPlayer.weapon.drawBullets();
 }
 
 Game.prototype.clearPage = function(){
@@ -87,6 +104,16 @@ Game.prototype.clearPage = function(){
     this.velY = 0;
     this.weapon = new Weapon(this.page, this);
     this.facingDirection = {xVel: 0.0, yVel: 0.0};
+    
+ }
+ 
+ Player.prototype.sendInfo = function(){
+    return {
+       player: this.player,
+       position: {x: this.x, y:this.y,},
+       direction: {velX: this.velX, velY: this.velY},
+       bullets: this.weapon.bullets,
+    };
  }
  
  Player.prototype.updateVelocity = function(x,y){
@@ -106,12 +133,31 @@ Game.prototype.clearPage = function(){
       this.y = radius;
     if(this.y > CANVASHEIGHT - radius)
       this.y = CANVASHEIGHT - radius;
+    
+    socket.emit('updatePlayerInfo', this.sendInfo());
+ }
+ Player.prototype.updateWithServerLocation = function(data){   
+    if(data.player == this.player){ 
+       this.x = data.position.x;
+       this.y = data.position.y;  
+       this.weapon.bullets = data.bullets;
+       var radius = 50;
+       if(this.x < radius)
+         this.x = radius;
+       if(this.x > CANVASWIDTH - radius)
+         this.x = CANVASWIDTH - radius;
+       if(this.y < radius)
+         this.y = radius;
+       if(this.y > CANVASHEIGHT - radius)
+         this.y = CANVASHEIGHT - radius;
+    }
  }
  
  Player.prototype.draw = function(){
-    this.page.fillCircle(this.x, this.y, 50, 'red');
+    this.page.fillCircle(this.x, this.y, 50, this.player);
  }
  
+
  /*******************
  * Weapon
  ******************/
@@ -122,7 +168,10 @@ Game.prototype.clearPage = function(){
      this.bullets = new Array();
      this.bulletSpeed = PISTOLBULLETSPEED;
      this.shootingSpeed = PISTOLSHOOTINGSPEED;
-     
+     if(this.player.player == 'black')
+        this.bulletColor = 'red';
+     if(this.player.player == 'blue')
+        this.bulletColor = 'green';
  }
 
  Weapon.prototype.shoot = function(){
@@ -139,7 +188,7 @@ Game.prototype.clearPage = function(){
  
  Weapon.prototype.drawBullets = function(){
       for(var i = 0; i < this.bullets.length; i++){
-         this.page.fillCircle(this.bullets[i].x, this.bullets[i].y, 5, 'green');
+         this.page.fillCircle(this.bullets[i].x, this.bullets[i].y, 15, this.bulletColor);
       }
  }
  
@@ -153,19 +202,22 @@ Game.prototype.clearPage = function(){
       }
  }
  
+ 
  /*******************
  * Movement Control
  *******************/
  
- var MoveControl = function(mainPage, mainPlayer) {
+ var Control = function(mainPage, mainPlayer) {
     this.player = mainPlayer;
     this.page = mainPage;
+    this.shootingID;
     this.setup();
  }
  
- MoveControl.prototype.setup = function(){
+Control.prototype.setup = function(){
     //if ('ontouchstart' in document.documentElement){
       this.initControllerBackground();
+      this.initShootingControllerBackground();
       //this.initControllerStick();
     //}
     //else{
@@ -173,7 +225,7 @@ Game.prototype.clearPage = function(){
     //}
  }
 
- MoveControl.prototype.initControllerBackground = function(){
+Control.prototype.initControllerBackground = function(){
     var controlCoords = {x: 0, y: 0,};
     controlCoords.x = 20;
     controlCoords.y = HEIGHT - 2*CONTROL_RADIUS - 20;
@@ -187,37 +239,19 @@ Game.prototype.clearPage = function(){
     controller.css("height", radius*2);
     controller.css("width", radius*2);
     
-    var down = this.movePlayer.bind(this); 
+    var down = this.finalControllerDown.bind(this); 
 
-    var up = this.stopPlayer.bind(this);
+    var up = this.finalControllerUp.bind(this); 
     var tap = function(){
        //alert("tap");
     };
-    var move = this.movePlayer.bind(this); 
+    var move = this.finalControllerMove.bind(this); 
 
-    controller.ontap(down, up, tap, move, this.player);
+    controller.ontap(down, up, tap, move, this);
     $('body').append(controller);
  }
  
- MoveControl.prototype.initControllerStick = function(){
-    var controlCoords = {x: 0, y: 0,};
-    var radius = CONTROL_RADIUS * (1/10);
-    
-    controlCoords.x = 20 + CONTROL_RADIUS - radius;
-    controlCoords.y = HEIGHT - CONTROL_RADIUS - 20 - radius;
-    
-    var stick = $('<div id="stick"></div>');
-    stick.css("left", controlCoords.x);
-    stick.css("top", controlCoords.y);
-    stick.css("border-radius", radius);
-    stick.css("-webkit-border-radius", radius);
-    stick.css("-moz-border-radius", radius);
-    stick.css("height", radius*2);
-    stick.css("width", radius*2);
-    $('#controller').append(stick);
- }
- 
- MoveControl.prototype.movePlayer = function(x,y){
+ Control.prototype.movePlayer = function(x,y){
        var center = {x: 0, y: 0,};
        var radius = CONTROL_RADIUS * (1/10);
 
@@ -225,27 +259,35 @@ Game.prototype.clearPage = function(){
        var minY = HEIGHT - 2*CONTROL_RADIUS - 20;
        var maxX = minX + 2*CONTROL_RADIUS;
        var maxY = minY + 2*CONTROL_RADIUS;
-       if(x < minX)
+       /*if(x < minX)
           x = minX;
        if(y < minY)
           y = minY;
        if(x > maxX)
           x = maxX;
        if(y > maxY)
-          y = maxY;
-
+          y = maxY;*/
+       if(x < minX || x > maxX || y < minY || y > maxY)
+         return;
     
        center.x = 20 + CONTROL_RADIUS - radius;
        center.y = HEIGHT - CONTROL_RADIUS - 20 - radius;
        
-       var velX = MAX_SPEED * ((x - center.x)/CONTROL_RADIUS);
-       var velY = MAX_SPEED * ((y - center.y)/CONTROL_RADIUS);
+       var velX = ((x - center.x));
+       var velY = ((y - center.y));
        var mag = Math.sqrt((velX*velX) + (velY*velY));
-       var speed = MAX_SPEED * mag/CONTROL_RADIUS;
+       if(mag < MAG_EPSILON){
+         velX = 0;
+         velY = 0;
+       }
+       else{
+          velX = MAXSPEED*((x - center.x)/mag);
+          velY = MAXSPEED*((y - center.y)/mag);
+       }
        
        this.player.updateVelocity(velX, velY);
     }
- MoveControl.prototype.stopPlayer =function(){
+ Control.prototype.stopPlayer = function(){
        var controlCoords = {x: 0, y: 0,};
        var radius = CONTROL_RADIUS * (1/10);
     
@@ -260,24 +302,8 @@ Game.prototype.clearPage = function(){
  * Shooting Control
  *******************/
  
- var ShootingControl = function(mainPage, mainPlayer) {
-    this.player = mainPlayer;
-    this.page = mainPage;
-    this.shootingID;
-    this.setup();
- }
- 
- ShootingControl.prototype.setup = function(){
-    //if ('ontouchstart' in document.documentElement){
-      this.initControllerBackground();
-      //this.initControllerStick();
-    //}
-    //else{
-    //  alert("No Touch Device Found, use arrow keys and mouse instead");
-    //}
- }
 
- ShootingControl.prototype.initControllerBackground = function(){
+ Control.prototype.initShootingControllerBackground = function(){
     var controlCoords = {x: 0, y: 0,};
     controlCoords.x = WIDTH - 2*CONTROL_RADIUS - 20;
     controlCoords.y = HEIGHT - 2*CONTROL_RADIUS - 20;
@@ -291,46 +317,30 @@ Game.prototype.clearPage = function(){
     controller.css("height", radius*2);
     controller.css("width", radius*2);
     
-    var down = this.startShooting.bind(this); 
+    var down = this.finalControllerDown.bind(this); 
 
-    var up = this.stopShooting.bind(this);
+    var up = this.finalControllerUp.bind(this); 
     var tap = function(){
        //alert("tap");
     };
-    var move = this.changeFacingDirection.bind(this); 
+    var move = this.finalControllerMove.bind(this);  
 
     controller.ontap(down, up, tap, move, this.player);
     $('body').append(controller);
  }
  
- ShootingControl.prototype.initControllerStick = function(){
-    var controlCoords = {x: 0, y: 0,};
-    var radius = CONTROL_RADIUS * (1/10);
-    
-    controlCoords.x = 20 + CONTROL_RADIUS - radius;
-    controlCoords.y = HEIGHT - CONTROL_RADIUS - 20 - radius;
-    
-    var stick = $('<div id="stick"></div>');
-    stick.css("left", controlCoords.x);
-    stick.css("top", controlCoords.y);
-    stick.css("border-radius", radius);
-    stick.css("-webkit-border-radius", radius);
-    stick.css("-moz-border-radius", radius);
-    stick.css("height", radius*2);
-    stick.css("width", radius*2);
-    $('#controller').append(stick);
- }
- ShootingControl.prototype.startShooting = function(x,y){
+ Control.prototype.startShooting = function(x,y){
       var direction = this.getFacingDirection(x,y);
       this.player.facingDirection = direction;
-      $("#txtmsg").text(this.player.weapon.shootingSpeed);
+      if(this.shootingID !== undefined) 
+         clearInterval(this.shootingID);
       this.shootingID = setInterval(this.player.weapon.shoot.bind(this.player.weapon), this.player.weapon.shootingSpeed);
  }
- ShootingControl.prototype.changeFacingDirection = function(x,y){
+ Control.prototype.changeFacingDirection = function(x,y){
       var direction = this.getFacingDirection(x,y);
       this.player.facingDirection = direction;
  }
- ShootingControl.prototype.getFacingDirection = function(x,y){
+ Control.prototype.getFacingDirection = function(x,y){
        var center = {x: 0, y: 0,};
        var radius = CONTROL_RADIUS * (1/10);
 
@@ -355,16 +365,43 @@ Game.prototype.clearPage = function(){
        var velX = ((x - center.x));
        var velY = ((y - center.y));
        var mag = Math.sqrt((velX*velX) + (velY*velY));
-       velX = ((x - center.x)/mag);
-       velY = ((y - center.y)/mag);
+       if(mag < MAG_EPSILON){
+         velX = 0;
+         velY = 0;
+       }
+       else{
+          velX = ((x - center.x)/mag);
+          velY = ((y - center.y)/mag);
+       }
        
        return {xVel: velX, yVel: velY};
        
     }
- ShootingControl.prototype.stopShooting = function(){
+ Control.prototype.stopShooting = function(){
        clearInterval(this.shootingID);
     }
-    
+ 
+ /*******************
+ *  Combined Controls
+ *******************/
+  Control.prototype.finalControllerDown = function(x,y){
+    if(x < WIDTH/2)
+      this.movePlayer(x,y);
+    if(x > WIDTH/2)
+      this.startShooting(x,y); 
+ }
+ 
+ Control.prototype.finalControllerMove = function(x,y){
+    if(x < WIDTH/2)
+      this.movePlayer(x,y);
+    if(x > WIDTH/2)
+      this.changeFacingDirection(x,y); 
+ }
+ 
+ Control.prototype.finalControllerUp = function(){
+    this.stopPlayer();
+    this.stopShooting(); 
+ }
  /*******************
  * Map
  *******************/

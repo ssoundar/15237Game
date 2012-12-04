@@ -23,7 +23,7 @@ function addTappableJQPlugin(){
     // call `tapCB` when the button is tapped
     // call moveCB when we move the touch
 
-    $.fn.ontap = function(downCB, upCB, tapCB, moveCB, player){
+    $.fn.ontap = function(downCB, upCB, tapCB, moveCB){
         // bind the callbacks to the jQuery object (standard jQuery behavior)
         downCB = downCB.bind(this);
         upCB = upCB.bind(this);
@@ -51,8 +51,8 @@ function addTappableJQPlugin(){
         var exit = function(){
             if (potentialTap){
                 potentialTap = false;
-                upCB();
             }
+            upCB();
         }
 
         var up = function(){
@@ -68,9 +68,12 @@ function addTappableJQPlugin(){
 
             this.on('touchstart', function(event){
                 event.preventDefault();
-                var x = event.originalEvent.touches[0].clientX;
-                var y = event.originalEvent.touches[0].clientY;
-                down(x, y);
+                var x, y;
+                for(var i = 0; i < event.originalEvent.touches.length; i++){
+                  x = event.originalEvent.touches[i].clientX;
+                  y = event.originalEvent.touches[i].clientY;
+                  down(x, y);
+                }
             });
             this.on('touchend', function(event){
                 event.preventDefault();
@@ -79,21 +82,36 @@ function addTappableJQPlugin(){
             // cancel on touchleave (finger moves out of object)
             this.on('touchleave', function(event){
                 event.preventDefault();
-                alert("Exit");
-                exit();
+                up();
             });
             this.on('touchcancel', function(event){
                 event.preventDefault();
-                alert("Exit");
-                exit();
+                up();
             });
             this.on('touchmove', function(event){
                 event.preventDefault();
-                var recentEventx = event.originalEvent.touches.length-1;
-                var recentEventy = event.originalEvent.touches.length-1;
-                var x = event.originalEvent.touches[recentEventx].clientX;
-                var y = event.originalEvent.touches[recentEventy].clientY;
-                move(x, y);
+                /*var x = event.originalEvent.touches[0].clientX;
+                var y = event.originalEvent.touches[0].clientY;
+                move(x, y);*/
+                
+                /* Found this on stackOverFlow for using touchleave */
+                event = event.originalEvent;
+  
+                function _isInBounds(touch, elemposition, width, height){
+                    var left = elemposition.left,
+                    right = left + width,
+                    top = elemposition.top,
+                    bottom = top + height,
+                    touchX = touch.pageX,
+                    touchY = touch.pageY;
+                    
+                    return (touchX > left && touchX < right && touchY > top && touchY < bottom);
+                };
+                for(var i = 0; i < event.touches.length; i++){
+                   var x = event.touches[i].clientX;
+                   var y = event.touches[i].clientY;
+                   move(x,y);
+                }
             });
         }
         // fallback to clicks
