@@ -61,7 +61,7 @@ var CANVASHEIGHT, CANVASWIDTH;
 var availableCharacters = new Array();
 var Player = {
    player : 'black',
-   position: {x: 0, y: 0,},
+   position: {x: 200, y: 200,},
    direction: {velX: 0, velY: 0,},
    bullets: new Array(),
 };
@@ -70,7 +70,7 @@ var players = new Array();
 players.push(Player);
 var Player2 = {
    player : 'blue',
-   position: {x: 100, y: 100,},
+   position: {x: 300, y: 300,},
    direction: {velX: 0, velY: 0,},
    bullets: new Array(),
 };

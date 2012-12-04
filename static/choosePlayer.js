@@ -1,6 +1,6 @@
 //CHAGNETHIS: Address to server
-var address = 'http://76.125.178.2:3000/';
-//var address = 'http://128.237.228.203:3000/';
+//var address = 'http://76.125.178.2:3000/';
+var address = 'http://128.237.242.111:3000/';
 var socket;
 $(document).ready(function() {
    socket = io.connect(address);
@@ -27,5 +27,6 @@ function resetUsers(){
    socket.emit('updateAvailableCharacters', 'reset');
    location.reload();
 }
+
 
 

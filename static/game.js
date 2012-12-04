@@ -1,6 +1,6 @@
 //CHAGNETHIS: Address to server
-var address = 'http://76.125.178.2:3000/';
-//var address = 'http://128.237.228.203:3000/';
+//var address = 'http://76.125.178.2:3000/';
+var address = 'http://128.237.242.111:3000/';
 var socket;
 
 //Page and Canvas Statics
@@ -19,6 +19,11 @@ var PISTOL = 0;
 var PISTOLBULLETSPEED = 5;
 var PISTOLSHOOTINGSPEED = 300;
 
+//Map Objects Statics
+var HORIZONTAL = 'horizontal';
+var VERTICAL = 'vetical'
+var WALL_THICKNESS = 20;
+
  /********
  * Game
  ********/
@@ -35,12 +40,17 @@ Game.prototype.setup = function(){
    window.util.patchRequestAnimationFrame();
    window.util.patchFnBind();
    this.initCanvas();
-   this.player = new Player(this.playerType, this.page);
-   this.otherPlayer = new Player(this.otherPlayerType, this.page);
+   this.map = new Map(this.page, this.player);
+   this.map.initializeObjectArray();
+   
+   this.player = new Player(this.playerType, this.page, this.map);
+   this.otherPlayer = new Player(this.otherPlayerType, this.page, this.map);
+   this.otherPlayer.x = 300;
+   this.otherPlayer.y = 300;
    socket.on('updateWithServerPosition', this.otherPlayer.updateWithServerLocation.bind(this.otherPlayer));
    this.controller = new Control(this.page, this.player);
    
-   this.map = new Map(this.page, this.player);
+   
    this.body.append($('<div id = "txtmsg">Hello</div>'));
 }
 Game.prototype.initCanvas = function(){
@@ -74,18 +84,24 @@ Game.prototype.draw = function(timeDiff){
     socket.emit('stepPlayerPosition',stepInfo);*/
 
     this.clearPage();
-    this.player.weapon.updateBulletsLocation(timeDiff);
-    this.player.updateLocation(timeDiff);
-    this.player.draw();
-    this.player.weapon.drawBullets();
+    this.updatePlayer(timeDiff);
 
     
     this.otherPlayer.draw();
     this.otherPlayer.weapon.drawBullets();
+    
+    this.map.drawObjects();
 }
 
 Game.prototype.clearPage = function(){
     this.page.fillRect(0, 0, this.width, this.height, '#eee');
+}
+
+Game.prototype.updatePlayer = function(timeDiff){
+    this.player.weapon.updateBulletsLocation(timeDiff);
+    this.player.updateLocation(timeDiff);
+    this.player.draw();
+    this.player.weapon.drawBullets();
 }
 
 
@@ -94,17 +110,17 @@ Game.prototype.clearPage = function(){
  * Player
  ********/
  
- var Player = function(playerType, page) {
+ var Player = function(playerType, page, map) {
     this.player = playerType;
     this.page = page;
-    var playerLocation = page.pageToCanvas(0,0);
-    this.x = playerLocation.x;
-    this.y = playerLocation.y;
+    this.x = 200;
+    this.y = 200;
     this.velX = 0;
     this.velY = 0;
     this.weapon = new Weapon(this.page, this);
     this.facingDirection = {xVel: 0.0, yVel: 0.0};
-    
+    this.radius = 50;
+    this.map = map;
  }
  
  Player.prototype.sendInfo = function(){
@@ -122,18 +138,27 @@ Game.prototype.clearPage = function(){
  }
  
  Player.prototype.updateLocation = function(timeDiff){
+    var oldx = this.x;
+    var oldy = this.y;
     this.x += this.velX*(timeDiff/20);
-    this.y += this.velY*(timeDiff/20);
-    var radius = 50;
+    
+    var radius = this.radius;
     if(this.x < radius)
       this.x = radius;
     if(this.x > CANVASWIDTH - radius)
-      this.x = CANVASWIDTH - radius;
+      this.x = CANVASWIDTH - radius;  
+    if(this.map.checkCollision(this.boundingCircle())){
+        this.x = oldx;
+    }
+    
+    this.y += this.velY*(timeDiff/20);
     if(this.y < radius)
       this.y = radius;
     if(this.y > CANVASHEIGHT - radius)
       this.y = CANVASHEIGHT - radius;
-    
+    if(this.map.checkCollision(this.boundingCircle())){
+        this.y = oldy;
+    }
     socket.emit('updatePlayerInfo', this.sendInfo());
  }
  Player.prototype.updateWithServerLocation = function(data){   
@@ -157,7 +182,15 @@ Game.prototype.clearPage = function(){
     this.page.fillCircle(this.x, this.y, 50, this.player);
  }
  
-
+ Player.prototype.boundingCircle = function(){
+    var circle = {
+        x: this.x,
+        y: this.y,
+        radius : this.radius,
+    };
+    return circle;
+ }
+ 
  /*******************
  * Weapon
  ******************/
@@ -408,8 +441,96 @@ Control.prototype.initControllerBackground = function(){
  var Map = function(mainPage, mainPlayer){
      this.page = mainPage;
      this.player = mainPlayer;
+     this.objects = new Array();
+     this.mapWidth = 5000;
+     this.mapHeight = 5000;
+ }
+ 
+ Map.prototype.initializeObjectArray = function(){
+     var wall1 = new Wall(this.page, 0, 0, HORIZONTAL, CANVASWIDTH, 'yellow');
+     var wall2 = new Wall(this.page, 0, CANVASHEIGHT - WALL_THICKNESS, HORIZONTAL, CANVASWIDTH, 'yellow');
+     var wall3 = new Wall(this.page, 0, 0, VERTICAL, CANVASHEIGHT, 'yellow');
+     var wall4 = new Wall(this.page, CANVASWIDTH - WALL_THICKNESS, 0, VERTICAL, CANVASHEIGHT, 'yellow');
+     this.objects.push(wall1);
+     this.objects.push(wall2);
+     this.objects.push(wall3);
+     this.objects.push(wall4);
  }
  
  Map.prototype.adjustToEgoCentric = function(x,y){
-     
+     var xOffset = x - this.player.x;
+     var yOffset = y - this.player.y;
+     var centerOfCanvas = {x: CANVASWIDTH/2, y: CANVASHEIGHT/2,};
+     return {x: centerOfCanvas.x + xOffset, y: centerOfCanvas.y + yOffset};
+ }
+ 
+ Map.prototype.drawObjects = function(){
+      for(var i = 0; i < this.objects.length; i++){
+           this.objects[i].draw();
+      }
+ }
+ 
+ Map.prototype.checkCollision = function(circle){
+      for(var i = 0; i < this.objects.length; i++){
+           if(this.objects[i].isCollision(circle) && !this.objects[i].passable)
+               return true;
+      }
+      return false;
+ }
+ /*****************
+ *  Map Objects
+ *****************/
+ 
+function MapObject(mainPage, initX, initY){
+      this.page = mainPage;
+      this.x = initX;
+      this.y = initY;
+      this.orientation = 'up';
+      this.width = 2;
+      this.height = 2;
+      this.passable = false;
+ }
+ 
+MapObject.prototype.isCollision = function(circle){
+      var rect = {x: this.x + this.width/2, y: this.y + this.height/2,};
+      var circDist = {x: Math.abs(circle.x - rect.x), y: Math.abs(circle.y - rect.y)};
+      if(circDist.x > (this.width/2 + circle.radius))
+         return false;
+      if(circDist.y > (this.height/2 + circle.radius))
+         return false;
+      
+      if(circDist.x <= (this.width/2))
+         return true;
+      if(circDist.y <= (this.height/2))
+         return true;
+      
+      var cornerDist = Math.pow((circDist.x - this.width/2),2) + Math.pow((circDist.y - this.height/2),2);
+      return (cornerDist <= Math.pow(circle.radius,2));
+ }
+ 
+ /**************
+ * Wall
+ **************/
+ function Wall(mainPage, initX, initY, orientation, length, color){
+      this.page = mainPage;
+      this.x = initX;
+      this.y = initY;
+      this.orientation = orientation;
+      if(orientation == HORIZONTAL){
+         this.width = length;
+         this.height = WALL_THICKNESS;
+      }
+      else if(orientation == VERTICAL){
+         this.width = WALL_THICKNESS;
+         this.height = length;
+      }
+      
+      this.passable = false;
+      this.color = color;
+ }
+ 
+ Wall.prototype = new MapObject();
+ Wall.prototype.constructor = Wall;
+ Wall.prototype.draw = function(){
+       this.page.fillRect(this.x, this.y, this.width, this.height, this.color);
  }
