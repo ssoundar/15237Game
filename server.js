@@ -64,6 +64,7 @@ var Player = {
    position: {x: 200, y: 200,},
    direction: {velX: 0, velY: 0,},
    bullets: new Array(),
+   health: 100,
 };
 
 var players = new Array();
@@ -73,8 +74,13 @@ var Player2 = {
    position: {x: 200, y: 200,},
    direction: {velX: 0, velY: 0,},
    bullets: new Array(),
+   health: 100,
 };
 players.push(Player2);
+
+var firstPlayer;
+
+var enemies = new Array();
 // Initialize the socket.io library
 // Start the socket.io server on port 3000
 // Remember.. this also serves the socket.io.js file!
@@ -111,30 +117,14 @@ io.sockets.on('connection', function(socket){
     socket.on('toggleSendAvailableCharacters', function(data) {
        console.log(availableCharacters);
        if(data === true){
+           if(availableCharacters.length >= 2 && availableCharacters.indexOf('black') >= 0 && availableCharacters.indexOf('blue') >= 0){
+                firstPlayer = 'neither';
+                enemies.splice(0,enemies.length);
+            }
            socket.emit('getAvailableCharacters', availableCharacters);
        }
     });
     
-    socket.on('stepPlayerPosition', function(stepInfo){
-        for(i = 0; i < players.length; i++){
-           if(players[i].player == stepInfo.player){
-                var timeDiff = stepInfo.timeDiff;
-                players[i].position.x += players[i].direction.velX*(timeDiff/20);
-                players[i].position.y += players[i].direction.velY*(timeDiff/20);
-                var radius = 50;
-                if(players[i].position.x < radius)
-                  players[i].position.x = radius;
-                if(players[i].position.x > CANVASWIDTH - radius)
-                  players[i].position.x = CANVASWIDTH - radius;
-                if(players[i].position.y < radius)
-                  players[i].position.y = radius;
-                if(players[i].position.y > CANVASHEIGHT - radius)
-                  players[i].position.y = CANVASHEIGHT - radius;
-           }
-        }
-        socket.emit('updatePlayerPosition', players[0]);
-        socket.emit('updatePlayerPosition', players[1]);
-    });
     
     socket.on('updatePlayerInfo', function(playerInfo){
         for(var i = 0; i < players.length; i++){
@@ -142,6 +132,7 @@ io.sockets.on('connection', function(socket){
                players[i].position = playerInfo.position;
                players[i].direction = playerInfo.direction;
                players[i].bullets = playerInfo.bullets;
+               players[i].health = playerInfo.health;
                //console.log(players[i].player + " " + players[i].position.x+" ,"+players[i].position.y);
             }
             socket.emit('updateWithServerPosition', players[i]);
@@ -153,5 +144,44 @@ io.sockets.on('connection', function(socket){
     socket.on('updateCanvasInfo', function(canvasInfo){
          CANVASWIDTH = canvasInfo.CANVASWIDTH;
          CANVASHEIGHT = canvasInfo.CANVASHEIGHT;
+    });
+    
+    socket.on('sendEnemies', function(enemyArray){
+         if(enemies.length < 1)
+            enemies = enemyArray;
+         socket.emit('updateEnemyPositionWithServer', enemies);
+         socket.emit('updateEnemyHealthWithServer', enemies);
+    });
+    
+    socket.on('updateEnemiesPosition', function(enemyList){
+      if(enemies.length < 1)
+         return;
+      for(var i = 0; i < enemyList.length; i++){
+         if(enemyList[i].movement){
+            if(enemies[i].x != enemyList[i].x)
+               enemies[i].x = enemyList[i].x;
+            if(enemies[i].y != enemyList[i].y)
+               enemies[i].y = enemyList[i].y;
+         }
+      }
+      socket.emit('updateEnemyPositionWithServer', enemies);
+    });
+    
+    socket.on('updateEnemiesHealth', function(enemyList){
+      if(enemies.length <1)
+         return;
+      for(var i = 0; i < enemyList.length; i++){
+            enemies[0].health = -2;
+      }
+      io.sockets.emit('updateEnemyHealthWithServer', enemies);
+    });
+    
+    socket.on('checkIn', function(playerInfo){
+        console.log(firstPlayer);
+        if(firstPlayer == undefined || firstPlayer == 'neither'){
+            firstPlayer = playerInfo.player;
+            
+        }
+        socket.emit('makeFirstPlayer', firstPlayer);
     });
 });

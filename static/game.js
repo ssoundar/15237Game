@@ -1,7 +1,7 @@
 //CHAGNETHIS: Address to server
 var address = 'http://76.125.178.2:3000/';
 //var address = 'http://128.237.242.111:3000/';
-var socket;
+
 
 //Page and Canvas Statics
 var HEIGHT= 800;
@@ -12,24 +12,37 @@ var CONTROL_RADIUS = 50;
 var SCALE;
 
 //Player Statics
-var MAXSPEED = 10;
+var MAXSPEED = 5;
 var MAG_EPSILON = 0.0001;
 //Weapon Statics
 var PISTOL = 0;
 var PISTOLBULLETSPEED = 15;
 var PISTOLSHOOTINGSPEED = 300;
-
+var PISTOLBULLETRADIUS = 15;
+var PISTOLDAMAGE = 10;
 //Map Objects Statics
 var HORIZONTAL = 'horizontal';
 var VERTICAL = 'vetical'
-var WALL_THICKNESS = 20;
+var WALL_THICKNESS = 50;
+var EDGE_COLOR = 'rgb(65,105,225)'
 
+//Map statics
+var MAP_WIDTH = 2000;
+var MAP_HEIGHT = 1000;
+
+//Enemy Statics
+var SIMPLE_CRAWLER = 1;
+
+//This game's Player
+var FIRST_PLAYER;
+var MAIN_PLAYER;
  /********
  * Game
  ********/
  var Game = function(playerType, otherPlayer) {
-   socket = io.connect(address);
-   socket.emit('updateAvailableCharacters', playerType);
+   this.socket = io.connect(address);
+   this.socket.emit('updateAvailableCharacters', playerType);
+   MAIN_PLAYER = playerType;
    this.playerType = playerType;
    this.otherPlayerType = otherPlayer;
    this.setup();
@@ -43,14 +56,18 @@ Game.prototype.setup = function(){
    this.map = new Map(this.page);
    this.map.initializeObjectArray();
    
-   this.player = new Player(this.playerType, this.page, this.map);
+   
+   this.player = new Player(this.playerType, this.page, this.map, this.socket);
    this.otherPlayer = new Player(this.otherPlayerType, this.page, this.map);
+   this.socket.on('makeFirstPlayer', this.player.makeFirstPlayer.bind(this.player));
+   this.socket.on('updateWithServerPosition', this.otherPlayer.updateWithServerLocation.bind(this.otherPlayer));
+   this.socket.emit('checkIn',this.player.sendInfo());
    
-   this.otherPlayer.x = 100;
-   this.otherPlayer.y = 100;
-   socket.on('updateWithServerPosition', this.otherPlayer.updateWithServerLocation.bind(this.otherPlayer));
    this.controller = new Control(this.page, this.player);
-   
+
+   this.socket.on('updateEnemyPositionWithServer', this.map.updateEnemyPositionWithServer.bind(this.map));
+   this.socket.on('updateEnemyHealthWithServer', this.map.updateEnemyHealthWithServer.bind(this.map));
+   this.socket.emit('sendEnemies',this.map.getEnemyList());
    
    this.body.append($('<div id = "txtmsg">Hello</div>'));
 }
@@ -71,7 +88,7 @@ Game.prototype.initCanvas = function(){
          CANVASWIDTH : CANVASWIDTH,
          CANVASHEIGHT: CANVASHEIGHT,
     };
-    socket.emit('updateCanvasInfo', canvasInfo);
+    this.socket.emit('updateCanvasInfo', canvasInfo);
 }
 
 /*********
@@ -79,16 +96,16 @@ Game.prototype.initCanvas = function(){
 *********/
 Game.prototype.draw = function(timeDiff){
     this.clearPage();
-    this.drawBackground();
     var center = {x: CANVASWIDTH/2, y: CANVASHEIGHT/2,};
     this.updatePlayer(timeDiff, this.player.x - center.x, this.player.y - center.y);
-      
-    $("#txtmsg").text(this.player.x + " " + this.player.y);
+    this.updateEnemies(timeDiff);
+    
     
     this.otherPlayer.drawOtherPlayer(this.player.x - center.x, this.player.y - center.y);
     this.otherPlayer.weapon.drawBullets(this.player.x - center.x, this.player.y - center.y);
     
     this.map.drawObjects(this.player.x - center.x, this.player.y - center.y);
+    this.checkIfAlive();
 }
 
 Game.prototype.clearPage = function(){
@@ -105,8 +122,33 @@ Game.prototype.drawBackground = function(){
 Game.prototype.updatePlayer = function(timeDiff, x, y){
     this.player.weapon.updateBulletsLocation(timeDiff);
     this.player.updateLocation(timeDiff);
+    this.drawBackground();
     this.player.drawMainPlayer();
     this.player.weapon.drawBullets(x,y);
+}
+
+Game.prototype.updateEnemies = function(timeDiff){
+    var enemies = this.map.enemies;
+    var noneKilled = true;
+    for(var i = 0; i < enemies.length; i++){
+        if(enemies[i].movement){
+             enemies[i].move(timeDiff, this.player, this.otherPlayer, this.map);
+        }
+        if(enemies[i].health == -1){
+            this.socket.emit('updateEnemiesHealth', this.map.getEnemyList());
+        }
+    }
+    if(this.player.first)
+      this.socket.emit('updateEnemiesPosition', this.map.getEnemyList());
+}
+
+Game.prototype.checkIfAlive = function(){
+    if(this.player.health <= 0 || this.otherPlayer.health <= 0)
+      this.endGame();
+}
+
+Game.prototype.endGame = function(){
+    this.page.fillRect(0, 0, this.width, this.height, 'black');
 }
 
  
@@ -114,17 +156,19 @@ Game.prototype.updatePlayer = function(timeDiff, x, y){
  * Player
  ********/
  
- var Player = function(playerType, page, map) {
+ var Player = function(playerType, page, map, socket) {
     this.player = playerType;
     this.page = page;
-    this.x = 100;
-    this.y = 100;
+    this.x = 150;
+    this.y = 150;
     this.velX = 0;
     this.velY = 0;
-    this.weapon = new Weapon(this.page, this);
+    this.map = map;
+    this.weapon = new Weapon(this.page, this, this.map);
     this.facingDirection = {xVel: 0.0, yVel: 0.0};
     this.radius = 50;
-    this.map = map;
+    this.health = 100;
+    this.socket = socket;
  }
  
  Player.prototype.sendInfo = function(){
@@ -133,6 +177,7 @@ Game.prototype.updatePlayer = function(timeDiff, x, y){
        position: {x: this.x, y:this.y,},
        direction: {velX: this.velX, velY: this.velY},
        bullets: this.weapon.bullets,
+       health: this.health,
     };
  }
  
@@ -151,19 +196,32 @@ Game.prototype.updatePlayer = function(timeDiff, x, y){
       this.x = radius;
     if(this.x > this.map.mapWidth - radius)
       this.x = this.map.mapWidth - radius;  
-    if(this.map.checkCollision(this.boundingCircle())){
-        this.x = oldx;
-    }
+    var collisionRet = this.map.checkCollision(this.boundingCircle());
+    if(collisionRet.collided){
+        if(collisionRet.collidedObject.passable){  
+            if(collisionRet.collidedObject.enemy){
+               this.hitEnemy(collisionRet.collidedObject);
+            }
+        }else{
+            this.x = oldx;
+        }
+    } 
     
     this.y += this.velY*(timeDiff/20);
     if(this.y < radius)
       this.y = radius;
     if(this.y > this.map.mapHeight - radius)
       this.y = this.map.mapHeight - radius;
-    if(this.map.checkCollision(this.boundingCircle())){
-        this.y = oldy;
+    collisionRet = this.map.checkCollision(this.boundingCircle());
+    if(collisionRet.collided){
+        if(collisionRet.collidedObject.passable){
+            if(collisionRet.collidedObject.enemy)
+               this.hitEnemy(collisionRet.collidedObject);
+        }else{
+            this.y = oldy;
+        }
     }
-    socket.emit('updatePlayerInfo', this.sendInfo());
+    this.socket.emit('updatePlayerInfo', this.sendInfo());
  }
  Player.prototype.updateWithServerLocation = function(data){   
     if(data.player == this.player){ 
@@ -179,6 +237,7 @@ Game.prototype.updatePlayer = function(timeDiff, x, y){
          this.y = radius;
        if(this.y > this.map.mapHeight - radius)
          this.y = this.map.mapHeight - radius;
+       this.health = data.health;
     }
  }
  
@@ -199,10 +258,23 @@ Game.prototype.updatePlayer = function(timeDiff, x, y){
     return circle;
  }
  
+ 
+ Player.prototype.hitEnemy = function(obj){
+    this.health -= obj.damage;
+    obj.health = -1;
+ }
+ 
+ Player.prototype.makeFirstPlayer = function(player){
+    FIRST_PLAYER = player;
+    if(this.player == player)
+      this.first = true;
+    else
+      this.first = false;
+ }
  /*******************
  * Weapon
  ******************/
- var Weapon = function(mainPage, mainPlayer){
+ var Weapon = function(mainPage, mainPlayer, map){
      this.page = mainPage;
      this.player = mainPlayer;
      this.type = PISTOL;
@@ -213,6 +285,9 @@ Game.prototype.updatePlayer = function(timeDiff, x, y){
         this.bulletColor = 'red';
      if(this.player.player == 'blue')
         this.bulletColor = 'green';
+     this.map = map;
+     this.bulletRadius = PISTOLBULLETRADIUS;
+     this.bulletDamage = PISTOLDAMAGE;
  }
 
  Weapon.prototype.shoot = function(){
@@ -229,17 +304,33 @@ Game.prototype.updatePlayer = function(timeDiff, x, y){
  
  Weapon.prototype.drawBullets = function(x,y){
       for(var i = 0; i < this.bullets.length; i++){
-         this.page.fillCircle(this.bullets[i].x-x, this.bullets[i].y-y, 15, this.bulletColor);
+         this.page.fillCircle(this.bullets[i].x-x, this.bullets[i].y-y, this.bulletRadius, this.bulletColor);
       }
  }
  
  Weapon.prototype.updateBulletsLocation = function(timeDiff){
+      var bullet, circle;
       for(var i = 0; i < this.bullets.length; i++){
-         var bullet = this.bullets[i];
+         bullet = this.bullets[i];
          bullet.x += this.bulletSpeed*bullet.direction.xVel*(timeDiff/20);
          bullet.y += this.bulletSpeed*bullet.direction.yVel*(timeDiff/20);
-         if(bullet.x < 0 || bullet.y < 0 || bullet.x > CANVASWIDTH || bullet.y > CANVASHEIGHT)
+         if(bullet.x < 0 || bullet.y < 0 || bullet.x > this.map.mapWidth || bullet.y > this.map.mapHeight)
             this.bullets.splice(i,1);
+         circle = {
+              x: bullet.x,
+              y: bullet.y,
+              radius: this.bulletRadius,
+         };
+         var collisionRet = this.map.checkCollision(circle);
+         if(collisionRet.collided){
+            this.bullets.splice(i,1);
+            if(collisionRet.collidedObject.enemy){
+                collisionRet.collidedObject.health -= this.bulletDamage;
+                if(collisionRet.collidedObject.health <= 0){
+                   collisionRet.collidedObject.health = -1;
+                }
+            }
+         }
       }
  }
  
@@ -300,14 +391,7 @@ Control.prototype.initControllerBackground = function(){
        var minY = HEIGHT - 2*CONTROL_RADIUS - 20;
        var maxX = minX + 2*CONTROL_RADIUS;
        var maxY = minY + 2*CONTROL_RADIUS;
-       /*if(x < minX)
-          x = minX;
-       if(y < minY)
-          y = minY;
-       if(x > maxX)
-          x = maxX;
-       if(y > maxY)
-          y = maxY;*/
+       
        if(x < minX || x > maxX || y < minY || y > maxY)
          return;
     
@@ -449,21 +533,36 @@ Control.prototype.initControllerBackground = function(){
  var Map = function(mainPage){
      this.page = mainPage;
      this.objects = new Array();
-     this.mapWidth = 5000;
-     this.mapHeight = 5000;
+     this.enemies = new Array();
+     this.mapWidth = MAP_WIDTH;
+     this.mapHeight = MAP_HEIGHT;
  }
  
  Map.prototype.initializeObjectArray = function(){
-     var wall1 = new Wall(this.page, 0, 0, HORIZONTAL, this.mapWidth, 'yellow');
-     var wall2 = new Wall(this.page, 0, this.mapHeight - WALL_THICKNESS, HORIZONTAL, this.mapWidth, 'yellow');
-     var wall3 = new Wall(this.page, 0, 0, VERTICAL, this.mapHeight, 'yellow');
-     var wall4 = new Wall(this.page, this.mapWidth - WALL_THICKNESS, 0, VERTICAL, this.mapHeight, 'yellow');
-     this.objects.push(wall1);
-     this.objects.push(wall2);
-     this.objects.push(wall3);
-     this.objects.push(wall4);
+     var opening = 400;
+     var frequency = 400;
+     var edgeWall1 = new Wall(this.page, 0, 0, HORIZONTAL, this.mapWidth, EDGE_COLOR);
+     var edgeWall2 = new Wall(this.page, 0, this.mapHeight - WALL_THICKNESS, HORIZONTAL, this.mapWidth, EDGE_COLOR);
+     var edgeWall3 = new Wall(this.page, 0, 0, VERTICAL, this.mapHeight, EDGE_COLOR);
+     var edgeWall4 = new Wall(this.page, this.mapWidth - WALL_THICKNESS, 0, VERTICAL, this.mapHeight, EDGE_COLOR);
+     
+     this.objects.push(edgeWall1);
+     this.objects.push(edgeWall2);
+     this.objects.push(edgeWall3);
+     this.objects.push(edgeWall4);
+     var startWidth = frequency;
+     while(startWidth < this.mapWidth - frequency){
+         var newWall1 = new Wall(this.page, startWidth, 0, VERTICAL, this.mapHeight - opening, EDGE_COLOR);
+         var newWall2 = new Wall(this.page, startWidth+frequency, opening, VERTICAL, this.mapHeight - opening, EDGE_COLOR);
+         startWidth += 2*frequency;
+         this.objects.push(newWall1);
+         this.objects.push(newWall2);
+     }
+     this.initializeEnemyArray();
  }
- 
+ Map.prototype.initializeEnemyArray = function(){
+     this.addEnemy(SIMPLE_CRAWLER, 600, 500);
+ }
  Map.prototype.drawObjects = function(x,y){
       for(var i = 0; i < this.objects.length; i++){
          var mapx = this.objects[i].x;
@@ -477,14 +576,80 @@ Control.prototype.initControllerBackground = function(){
          this.objects[i].x = mapx;
          this.objects[i].y = mapy;
       }
+      for(var i = 0; i < this.enemies.length; i++){
+         var mapx = this.enemies[i].x;
+         var mapy = this.enemies[i].y;
+         
+         this.enemies[i].x = this.enemies[i].x - x;
+         this.enemies[i].y = this.enemies[i].y - y;
+         
+         this.enemies[i].draw();
+         
+         this.enemies[i].x = mapx;
+         this.enemies[i].y = mapy;
+      }
  }
  
  Map.prototype.checkCollision = function(circle){
+     var check = this.checkCollisionObjects(circle);
+     if(check.collided)
+         return check;
+     check = this.checkCollisionEnemies(circle);
+     if(check.collided)
+         return check;
+     return {collided: false,};
+ }
+ 
+ Map.prototype.checkCollisionObjects = function(circle){
       for(var i = 0; i < this.objects.length; i++){
-           if(this.objects[i].isCollision(circle) && !this.objects[i].passable)
-               return true;
+           if(this.objects[i].isCollision(circle))
+               return {collided: true, collidedObject: this.objects[i],};
       }
-      return false;
+      return {collided: false,};
+ }
+ 
+ Map.prototype.checkCollisionEnemies = function(circle){
+      for(var i = 0; i < this.enemies.length; i++){
+           if(this.enemies[i].isCollision(circle))
+               return {collided: true, collidedObject: this.enemies[i],};
+      }
+      return {collided: false,};
+ }
+ 
+ Map.prototype.getEnemyList = function(){
+      var list = new Array();
+      for(var i = 0; i < this.enemies.length; i++){
+         list.push(this.enemies[i].boundingCircle());
+      }
+      return list;
+ }
+ 
+ Map.prototype.updateEnemyPositionWithServer = function(enemyList){
+      for(var i = 0; i < enemyList.length; i++){
+         if(enemyList[i].movement){
+           if(MAIN_PLAYER != FIRST_PLAYER){
+               if(this.enemies[i].x != enemyList[i].x)
+                  this.enemies[i].x = enemyList[i].x;
+               if(this.enemies[i].y != enemyList[i].y)
+                  this.enemies[i].y = enemyList[i].y;
+           }
+         }
+      }
+ }
+ Map.prototype.updateEnemyHealthWithServer = function(enemyList){
+      
+      for(var i = 0; i < enemyList.length; i++){
+         if(enemyList[i].health <= 0)
+            this.enemies[i].health = -2;
+      }
+      $("#txtmsg").text(enemyList[0].health + " " + this.enemies[0].health);
+ }
+ Map.prototype.addEnemy = function(type, initX, initY){
+      switch(type){
+                 case SIMPLE_CRAWLER:
+                     this.enemies.push(new SimpleCrawler(this.page, initX, initY));
+                     break;
+      }
  }
  /*****************
  *  Map Objects
@@ -497,7 +662,6 @@ function MapObject(mainPage, initX, initY){
       this.orientation = 'up';
       this.width = 2;
       this.height = 2;
-      this.passable = false;
  }
  
 MapObject.prototype.isCollision = function(circle){
@@ -533,7 +697,6 @@ MapObject.prototype.isCollision = function(circle){
          this.width = WALL_THICKNESS;
          this.height = length;
       }
-      
       this.passable = false;
       this.color = color;
  }
@@ -542,4 +705,115 @@ MapObject.prototype.isCollision = function(circle){
  Wall.prototype.constructor = Wall;
  Wall.prototype.draw = function(){
        this.page.fillRect(this.x, this.y, this.width, this.height, this.color);
+ }
+ 
+ /*****************
+ * Enemies
+ *****************/
+  function Enemy(mainPage, initX, initY){
+      this.page = mainPage;
+      this.x = initX;
+      this.y = initY;
+      this.radius = 10;
+      this.color = 'red';
+      this.damage = 200;
+      this.health = 20;
+      this.enemy = true;
+      this.passable = true;
+      this.type = 0;
+      this.movement = false;
+ }
+ Enemy.prototype = new MapObject();
+ Enemy.prototype.constructor = Enemy;
+ Enemy.prototype.draw = function(){
+      if(this.health > 0)
+       this.page.fillCircle(this.x, this.y, this.radius, this.color);
+ }
+ Enemy.prototype.isCollision = function(circle){
+      if(this.health <= 0)
+         return false;
+      var dist = Math.pow((circle.x - this.x),2) + Math.pow((circle.y - this.y),2);
+      if(dist < Math.pow((circle.radius + this.radius),2)){
+         return true;
+      }
+      return false;
+ }
+ Enemy.prototype.boundingCircle = function(){
+    var circle = {
+        x: this.x,
+        y: this.y,
+        radius : this.radius,
+        type: this.type,
+        movement: this.movement,
+        health: this.health,
+    };
+    return circle;
+ }
+ 
+ function SimpleCrawler(mainPage, initX, initY){
+      this.type = SIMPLE_CRAWLER;
+      this.page = mainPage;
+      this.x = initX;
+      this.y = initY;
+      this.radius = 25;
+      this.color = 'lightgreen';
+      this.damage = 200;
+      this.health = 20;
+      this.moveSpeed = 1;
+      this.movement = true;
+ }
+ SimpleCrawler.prototype = new Enemy();
+ SimpleCrawler.prototype.constructor = SimpleCrawler;
+ SimpleCrawler.prototype.move = function(timeDiff, player1, player2, map){
+       if(this.health <= 0)
+         return;
+       var dist1 = Math.pow((player1.x - this.x),2) + Math.pow((player1.y - this.y),2);
+       var dist2 = Math.pow((player2.x - this.x),2) + Math.pow((player2.y - this.y),2);
+       
+       var moveTo;
+       if(dist1 < dist2)
+         moveTo = player1;
+       else
+         moveTo = player2;
+         
+       var velX = moveTo.x - this.x;
+       var velY = moveTo.y - this.y;
+       
+       var mag = Math.sqrt((velX*velX) + (velY*velY));
+       
+       if(mag < MAG_EPSILON){
+         velX = 0;
+         velY = 0;
+       }
+       else{
+          velX = this.moveSpeed*(velX/mag);
+          velY = this.moveSpeed*(velY/mag);
+       }
+
+       var radius = this.radius;
+       var collisionRet;
+       
+       var oldx = this.x;
+       var oldy = this.y;
+       
+       this.x += velX*(timeDiff/20);
+       if(this.x < radius)
+         this.x = radius;
+       if(this.x > map.mapWidth - radius)
+         this.x = map.mapWidth - radius;
+       collisionRet = map.checkCollisionObjects(this.boundingCircle());
+       
+       if(collisionRet.collided){
+           this.x = oldx;
+       }
+       
+       this.y += velY*(timeDiff/20);
+       if(this.y < radius)
+         this.y = radius;
+       if(this.y > map.mapHeight - radius)
+         this.y = map.mapHeight - radius;
+       collisionRet = map.checkCollisionObjects(this.boundingCircle());
+       if(collisionRet.collided){
+           this.y = oldy;
+       }
  }
