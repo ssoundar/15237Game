@@ -1,6 +1,6 @@
 //CHAGNETHIS: Address to server
-//var address = 'http://76.125.178.2:3000/';
-var address = 'http://128.237.242.111:3000/';
+var address = 'http://76.125.178.2:3000/';
+//var address = 'http://128.237.242.111:3000/';
 var socket;
 
 //Page and Canvas Statics
@@ -16,7 +16,7 @@ var MAXSPEED = 10;
 var MAG_EPSILON = 0.0001;
 //Weapon Statics
 var PISTOL = 0;
-var PISTOLBULLETSPEED = 5;
+var PISTOLBULLETSPEED = 15;
 var PISTOLSHOOTINGSPEED = 300;
 
 //Map Objects Statics
@@ -40,13 +40,14 @@ Game.prototype.setup = function(){
    window.util.patchRequestAnimationFrame();
    window.util.patchFnBind();
    this.initCanvas();
-   this.map = new Map(this.page, this.player);
+   this.map = new Map(this.page);
    this.map.initializeObjectArray();
    
    this.player = new Player(this.playerType, this.page, this.map);
    this.otherPlayer = new Player(this.otherPlayerType, this.page, this.map);
-   this.otherPlayer.x = 300;
-   this.otherPlayer.y = 300;
+   
+   this.otherPlayer.x = 100;
+   this.otherPlayer.y = 100;
    socket.on('updateWithServerPosition', this.otherPlayer.updateWithServerLocation.bind(this.otherPlayer));
    this.controller = new Control(this.page, this.player);
    
@@ -71,39 +72,42 @@ Game.prototype.initCanvas = function(){
          CANVASHEIGHT: CANVASHEIGHT,
     };
     socket.emit('updateCanvasInfo', canvasInfo);
-};
+}
 
 /*********
 * Drawing
 *********/
 Game.prototype.draw = function(timeDiff){
-    /*var stepInfo = {
-      timeDiff: timeDiff,
-      player: this.player.player
-    };
-    socket.emit('stepPlayerPosition',stepInfo);*/
-
     this.clearPage();
-    this.updatePlayer(timeDiff);
-
+    this.drawBackground();
+    var center = {x: CANVASWIDTH/2, y: CANVASHEIGHT/2,};
+    this.updatePlayer(timeDiff, this.player.x - center.x, this.player.y - center.y);
+      
+    $("#txtmsg").text(this.player.x + " " + this.player.y);
     
-    this.otherPlayer.draw();
-    this.otherPlayer.weapon.drawBullets();
+    this.otherPlayer.drawOtherPlayer(this.player.x - center.x, this.player.y - center.y);
+    this.otherPlayer.weapon.drawBullets(this.player.x - center.x, this.player.y - center.y);
     
-    this.map.drawObjects();
+    this.map.drawObjects(this.player.x - center.x, this.player.y - center.y);
 }
 
 Game.prototype.clearPage = function(){
-    this.page.fillRect(0, 0, this.width, this.height, '#eee');
+    this.page.fillRect(0, 0, this.width, this.height, 'black');
 }
 
-Game.prototype.updatePlayer = function(timeDiff){
+Game.prototype.drawBackground = function(){
+    var center = {x: CANVASWIDTH/2, y: CANVASHEIGHT/2,};
+    this.page.fillRect(center.x - this.player.x, center.y - this.player.y,
+                       Math.abs(this.player.x) + this.map.mapWidth-this.player.x, 
+                       Math.abs(this.player.y) + this.map.mapHeight-this.player.y,  'white');
+}
+
+Game.prototype.updatePlayer = function(timeDiff, x, y){
     this.player.weapon.updateBulletsLocation(timeDiff);
     this.player.updateLocation(timeDiff);
-    this.player.draw();
-    this.player.weapon.drawBullets();
+    this.player.drawMainPlayer();
+    this.player.weapon.drawBullets(x,y);
 }
-
 
  
  /********
@@ -113,8 +117,8 @@ Game.prototype.updatePlayer = function(timeDiff){
  var Player = function(playerType, page, map) {
     this.player = playerType;
     this.page = page;
-    this.x = 200;
-    this.y = 200;
+    this.x = 100;
+    this.y = 100;
     this.velX = 0;
     this.velY = 0;
     this.weapon = new Weapon(this.page, this);
@@ -145,8 +149,8 @@ Game.prototype.updatePlayer = function(timeDiff){
     var radius = this.radius;
     if(this.x < radius)
       this.x = radius;
-    if(this.x > CANVASWIDTH - radius)
-      this.x = CANVASWIDTH - radius;  
+    if(this.x > this.map.mapWidth - radius)
+      this.x = this.map.mapWidth - radius;  
     if(this.map.checkCollision(this.boundingCircle())){
         this.x = oldx;
     }
@@ -154,8 +158,8 @@ Game.prototype.updatePlayer = function(timeDiff){
     this.y += this.velY*(timeDiff/20);
     if(this.y < radius)
       this.y = radius;
-    if(this.y > CANVASHEIGHT - radius)
-      this.y = CANVASHEIGHT - radius;
+    if(this.y > this.map.mapHeight - radius)
+      this.y = this.map.mapHeight - radius;
     if(this.map.checkCollision(this.boundingCircle())){
         this.y = oldy;
     }
@@ -169,17 +173,21 @@ Game.prototype.updatePlayer = function(timeDiff){
        var radius = 50;
        if(this.x < radius)
          this.x = radius;
-       if(this.x > CANVASWIDTH - radius)
-         this.x = CANVASWIDTH - radius;
+       if(this.x > this.map.mapWidth - radius)
+         this.x = this.map.mapWidth - radius;
        if(this.y < radius)
          this.y = radius;
-       if(this.y > CANVASHEIGHT - radius)
-         this.y = CANVASHEIGHT - radius;
+       if(this.y > this.map.mapHeight - radius)
+         this.y = this.map.mapHeight - radius;
     }
  }
  
- Player.prototype.draw = function(){
-    this.page.fillCircle(this.x, this.y, 50, this.player);
+ Player.prototype.drawOtherPlayer = function(x,y){
+    this.page.fillCircle(this.x-x, this.y-y, this.radius, this.player);
+ }
+ 
+  Player.prototype.drawMainPlayer = function(){
+    this.page.fillCircle(CANVASWIDTH/2, CANVASHEIGHT/2, this.radius, this.player);
  }
  
  Player.prototype.boundingCircle = function(){
@@ -219,9 +227,9 @@ Game.prototype.updatePlayer = function(timeDiff){
      }
  }
  
- Weapon.prototype.drawBullets = function(){
+ Weapon.prototype.drawBullets = function(x,y){
       for(var i = 0; i < this.bullets.length; i++){
-         this.page.fillCircle(this.bullets[i].x, this.bullets[i].y, 15, this.bulletColor);
+         this.page.fillCircle(this.bullets[i].x-x, this.bullets[i].y-y, 15, this.bulletColor);
       }
  }
  
@@ -438,35 +446,36 @@ Control.prototype.initControllerBackground = function(){
  /*******************
  * Map
  *******************/
- var Map = function(mainPage, mainPlayer){
+ var Map = function(mainPage){
      this.page = mainPage;
-     this.player = mainPlayer;
      this.objects = new Array();
      this.mapWidth = 5000;
      this.mapHeight = 5000;
  }
  
  Map.prototype.initializeObjectArray = function(){
-     var wall1 = new Wall(this.page, 0, 0, HORIZONTAL, CANVASWIDTH, 'yellow');
-     var wall2 = new Wall(this.page, 0, CANVASHEIGHT - WALL_THICKNESS, HORIZONTAL, CANVASWIDTH, 'yellow');
-     var wall3 = new Wall(this.page, 0, 0, VERTICAL, CANVASHEIGHT, 'yellow');
-     var wall4 = new Wall(this.page, CANVASWIDTH - WALL_THICKNESS, 0, VERTICAL, CANVASHEIGHT, 'yellow');
+     var wall1 = new Wall(this.page, 0, 0, HORIZONTAL, this.mapWidth, 'yellow');
+     var wall2 = new Wall(this.page, 0, this.mapHeight - WALL_THICKNESS, HORIZONTAL, this.mapWidth, 'yellow');
+     var wall3 = new Wall(this.page, 0, 0, VERTICAL, this.mapHeight, 'yellow');
+     var wall4 = new Wall(this.page, this.mapWidth - WALL_THICKNESS, 0, VERTICAL, this.mapHeight, 'yellow');
      this.objects.push(wall1);
      this.objects.push(wall2);
      this.objects.push(wall3);
      this.objects.push(wall4);
  }
  
- Map.prototype.adjustToEgoCentric = function(x,y){
-     var xOffset = x - this.player.x;
-     var yOffset = y - this.player.y;
-     var centerOfCanvas = {x: CANVASWIDTH/2, y: CANVASHEIGHT/2,};
-     return {x: centerOfCanvas.x + xOffset, y: centerOfCanvas.y + yOffset};
- }
- 
- Map.prototype.drawObjects = function(){
+ Map.prototype.drawObjects = function(x,y){
       for(var i = 0; i < this.objects.length; i++){
-           this.objects[i].draw();
+         var mapx = this.objects[i].x;
+         var mapy = this.objects[i].y;
+         
+         this.objects[i].x = this.objects[i].x - x;
+         this.objects[i].y = this.objects[i].y - y;
+         
+         this.objects[i].draw();
+         
+         this.objects[i].x = mapx;
+         this.objects[i].y = mapy;
       }
  }
  

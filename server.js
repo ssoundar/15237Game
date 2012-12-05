@@ -70,7 +70,7 @@ var players = new Array();
 players.push(Player);
 var Player2 = {
    player : 'blue',
-   position: {x: 300, y: 300,},
+   position: {x: 200, y: 200,},
    direction: {velX: 0, velY: 0,},
    bullets: new Array(),
 };
