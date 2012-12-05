@@ -12,7 +12,7 @@ var CONTROL_RADIUS = 50;
 var SCALE;
 
 //Player Statics
-var MAXSPEED = 5;
+var MAXSPEED = 8;
 var MAG_EPSILON = 0.0001;
 //Weapon Statics
 var PISTOL = 0;
@@ -32,7 +32,11 @@ var MAP_HEIGHT = 1000;
 
 //Enemy Statics
 var SIMPLE_CRAWLER = 1;
-
+var SIMPLE_CRAWLER_SPEED = 1;
+var ADVANCED_CRAWLER = 2;
+var ADVANCED_CRAWLER_SPEED = 600;
+var ANGRY_CRAWLER = 3;
+var ANGRY_CRAWLER_SPEED = 100;
 //This game's Player
 var FIRST_PLAYER;
 var MAIN_PLAYER;
@@ -562,6 +566,10 @@ Control.prototype.initControllerBackground = function(){
  }
  Map.prototype.initializeEnemyArray = function(){
      this.addEnemy(SIMPLE_CRAWLER, 600, 500);
+     this.addEnemy(SIMPLE_CRAWLER, 700, 500);
+     this.addEnemy(SIMPLE_CRAWLER, 500, 100);
+     this.addEnemy(ADVANCED_CRAWLER, 600, 200);
+     this.addEnemy(ANGRY_CRAWLER, 900, 200);
  }
  Map.prototype.drawObjects = function(x,y){
       for(var i = 0; i < this.objects.length; i++){
@@ -648,6 +656,12 @@ Control.prototype.initControllerBackground = function(){
       switch(type){
                  case SIMPLE_CRAWLER:
                      this.enemies.push(new SimpleCrawler(this.page, initX, initY));
+                     break;
+                 case ADVANCED_CRAWLER:
+                     this.enemies.push(new AdvancedCrawler(this.page, initX, initY));
+                     break;
+                 case ANGRY_CRAWLER:
+                     this.enemies.push(new AngryCrawler(this.page, initX, initY));
                      break;
       }
  }
@@ -750,6 +764,9 @@ MapObject.prototype.isCollision = function(circle){
     return circle;
  }
  
+ /****************
+ * Simple Crawler
+ ****************/
  function SimpleCrawler(mainPage, initX, initY){
       this.type = SIMPLE_CRAWLER;
       this.page = mainPage;
@@ -757,14 +774,17 @@ MapObject.prototype.isCollision = function(circle){
       this.y = initY;
       this.radius = 25;
       this.color = 'lightgreen';
-      this.damage = 200;
+      this.damage = 5;
       this.health = 20;
-      this.moveSpeed = 1;
+      this.moveSpeed = SIMPLE_CRAWLER_SPEED;
       this.movement = true;
  }
  SimpleCrawler.prototype = new Enemy();
  SimpleCrawler.prototype.constructor = SimpleCrawler;
  SimpleCrawler.prototype.move = function(timeDiff, player1, player2, map){
+       this.simpleMove(timeDiff, player1, player2, map);
+ }
+ SimpleCrawler.prototype.simpleMove = function(timeDiff, player1, player2, map){
        if(this.health <= 0)
          return;
        var dist1 = Math.pow((player1.x - this.x),2) + Math.pow((player1.y - this.y),2);
@@ -817,3 +837,59 @@ MapObject.prototype.isCollision = function(circle){
            this.y = oldy;
        }
  }
+ 
+ /*****************
+ * Advanced Crawler
+ ******************/
+ function AdvancedCrawler(mainPage, initX, initY){
+      this.type = SIMPLE_CRAWLER;
+      this.page = mainPage;
+      this.x = initX;
+      this.y = initY;
+      this.radius = 25;
+      this.color = 'orange';
+      this.damage = 10;
+      this.health = 30;
+      this.moveSpeed = ADVANCED_CRAWLER_SPEED;
+      this.movement = true;
+ }
+ AdvancedCrawler.prototype = new SimpleCrawler();
+ AdvancedCrawler.prototype.constructor = AdvancedCrawler;
+ AdvancedCrawler.prototype.move = function(timeDiff, player1, player2, map){
+      if(this.health <= 0)
+         return;
+       var dist1 = Math.pow((player1.x - this.x),2) + Math.pow((player1.y - this.y),2);
+       var dist2 = Math.pow((player2.x - this.x),2) + Math.pow((player2.y - this.y),2);
+
+       if(dist1 < dist2)
+          this.moveSpeed = ADVANCED_CRAWLER_SPEED/Math.sqrt(dist1);
+       else
+          this.moveSpeed = ADVANCED_CRAWLER_SPEED/Math.sqrt(dist2);
+          
+       this.simpleMove(timeDiff, player1, player2, map);
+ }
+ 
+ /*****************
+ * Angry Crawler
+ ******************/
+ function AngryCrawler(mainPage, initX, initY){
+      this.type = SIMPLE_CRAWLER;
+      this.page = mainPage;
+      this.x = initX;
+      this.y = initY;
+      this.radius = 25;
+      this.color = 'pink';
+      this.damage = 4;
+      this.health = 20;
+      this.moveSpeed = ANGRY_CRAWLER_SPEED;
+      this.movement = true;
+ }
+ AngryCrawler.prototype = new SimpleCrawler();
+ AngryCrawler.prototype.constructor = AngryCrawler;
+ AngryCrawler.prototype.move = function(timeDiff, player1, player2, map){
+      
+       this.moveSpeed = ANGRY_CRAWLER_SPEED/this.health;
+       this.damage = 4*this.health;   
+       this.simpleMove(timeDiff, player1, player2, map);
+ }
+ 

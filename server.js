@@ -133,12 +133,9 @@ io.sockets.on('connection', function(socket){
                players[i].direction = playerInfo.direction;
                players[i].bullets = playerInfo.bullets;
                players[i].health = playerInfo.health;
-               //console.log(players[i].player + " " + players[i].position.x+" ,"+players[i].position.y);
             }
-            socket.emit('updateWithServerPosition', players[i]);
+            io.sockets.emit('updateWithServerPosition', players[i]);
         }
-        //console.log(players[0].player + ":" + players[0].position.x + ", "+players[0].position.y);
-        //console.log(players[1].player + ":" + players[1].position.x + ", "+players[1].position.y);
     });
     
     socket.on('updateCanvasInfo', function(canvasInfo){

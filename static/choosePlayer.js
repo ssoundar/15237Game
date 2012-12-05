@@ -1,8 +1,9 @@
 //CHAGNETHIS: Address to server
 var address = 'http://76.125.178.2:3000/';
 //var address = 'http://128.237.242.111:3000/';
-var socket;
+
 $(document).ready(function() {
+   var socket;
    socket = io.connect(address);
    socket.emit('toggleSendAvailableCharacters', true);
    socket.on('getAvailableCharacters', function(data) {
@@ -24,6 +25,8 @@ function setUserID(playerType, otherPlayer){
 }
 
 function resetUsers(){
+   var socket;
+   socket = io.connect(address);
    socket.emit('updateAvailableCharacters', 'reset');
    location.reload();
 }
