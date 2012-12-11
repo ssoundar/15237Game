@@ -39,7 +39,7 @@ window.util.patchRequestAnimationFrame = function(){
             function(fn){
                 setTimeout(function(){
                     fn(Date.now());
-                }, 1000/60);
+                }, 1000/24);
             };
 }
 

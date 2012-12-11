@@ -26,7 +26,7 @@ app.configure(function(){
 });
 
 function serveStaticFile(request, response) {
-   /* //notify the user they're logged in. Necessary because
+    //notify the user they're logged in. Necessary because
     //  we use the same html for logging in and when they're
     //  logged in
     if (request.user !== undefined){
@@ -37,7 +37,7 @@ function serveStaticFile(request, response) {
         response.cookie("user", "none");
         response.cookie("name", "none");
     }
-    console.log("user:", request.user);*/
+    console.log("user:", request.user);
     response.sendfile("static/" + request.params.staticFilename);
 }
 
@@ -47,6 +47,51 @@ app.listen(8889);
 
 process.on("uncaughtException", onUncaughtException);
 
+//======================================
+//      passport
+//======================================
+
+app.post('/login',
+  passport.authenticate('local', { successRedirect: '/static/game.html',
+                                   failureRedirect: '/static/loginFail.html',
+                                   failureFlash: true }));
+
+//registering new users would be done by adding to these data structures
+var idToUser = [
+    { id: 0, username: 'player1', password: 'password', email: 'bob@example.com' },
+    { id: 1, username: 'player2', password: 'password', email: 'bob2@example.com' }
+];
+
+var usernameToId = {'player1': 0, 'player2': 1};
+var sessToId = {};
+
+passport.use(new PassportLocalStrategy(
+    function(username, password, done) {
+        if (usernameToId[username] === undefined)
+            return done(null, false, { message: 'Unknown user ' + username });
+        var user = idToUser[usernameToId[username]];
+
+        // Create a session ID per user auth and store it for websocket
+        // payload validation.
+        var sessId = Math.random().toString(36).substring(7);
+        user.sessionId = sessId;
+        sessToId[sessId] = user.id;
+
+        if (user === undefined)
+            return done(null, false, { message: 'Unknown user ' + username });
+        if (user.password !== password)
+            return done(null, false, { message: 'Invalid password' });
+        return done(null, user);
+    }
+));
+
+passport.serializeUser(function(user, done) {
+  done(null, user.id);
+});
+
+passport.deserializeUser(function(id, done) {
+    done(null, idToUser[id]);
+});
 
 //======================================
 //      handling uncaught exceptions
@@ -56,6 +101,9 @@ function onUncaughtException(err) {
     var err = "uncaught exception: " + err;
     console.log(err);
 }
+
+
+/*******************************************/
 
 var CANVASHEIGHT, CANVASWIDTH;
 var availableCharacters = new Array();
@@ -81,6 +129,9 @@ players.push(Player2);
 var firstPlayer;
 
 var enemies = new Array();
+
+var sessToPlayerType = {};
+
 // Initialize the socket.io library
 // Start the socket.io server on port 3000
 // Remember.. this also serves the socket.io.js file!
@@ -103,6 +154,19 @@ io.sockets.on('connection', function(socket){
         }
     });
     
+    socket.on('registerUser', function(data){
+      if(usernameToId[data.username] != undefined){
+         var toAdd = { id: idToUser.length, username: data.username, password: data.password, email: '' };
+         idToUser.push(toAdd);
+         usernameToId[data.username] = idToUser.length - 1;
+      }
+    });
+    
+    socket.on('setPlayer', function(userInfo){
+      sessToPlayerType[userInfo.sessId] = userInfo.playerType;
+      console.log("sessTotype" + sessToPlayerType[userInfo.sessId]);
+    });
+    
     socket.on('updateAvailableCharacters', function(data) {
        if(data === 'reset'){
           var len = availableCharacters.length;
@@ -115,13 +179,12 @@ io.sockets.on('connection', function(socket){
     });
     
     socket.on('toggleSendAvailableCharacters', function(data) {
-       console.log(availableCharacters);
        if(data === true){
-           if(availableCharacters.length >= 2 && availableCharacters.indexOf('black') >= 0 && availableCharacters.indexOf('blue') >= 0){
-                firstPlayer = 'neither';
-                enemies.splice(0,enemies.length);
-            }
-           socket.emit('getAvailableCharacters', availableCharacters);
+           var data = {
+               availableCharacters: availableCharacters,
+               sessIdToType: sessToPlayerType,
+           };
+           socket.emit('getAvailableCharacters', data);
        }
     });
     
@@ -168,13 +231,13 @@ io.sockets.on('connection', function(socket){
       if(enemies.length <1)
          return;
       for(var i = 0; i < enemyList.length; i++){
-            enemies[0].health = -2;
+            if(enemyList[i].health == -1)
+               enemies[i].health = -2;
       }
       io.sockets.emit('updateEnemyHealthWithServer', enemies);
     });
     
     socket.on('checkIn', function(playerInfo){
-        console.log(firstPlayer);
         if(firstPlayer == undefined || firstPlayer == 'neither'){
             firstPlayer = playerInfo.player;
             

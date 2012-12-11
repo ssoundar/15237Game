@@ -1,24 +1,87 @@
 <html>
 <head>
-   <meta name="viewport" content="width=device-width, user-scalable=no">
+   <meta name='viewport' content='initial-scale=1.0 maximum-scale=1.0 minimum-scale=1.0 user-scalable=0' />
    <meta name="apple-mobile-web-app-capable" content="yes">
    <script src='jquery-1.8.2.min.js'></script>
    <!-- CHAGNETHIS: Address to server !-->
-   <script src="http://76.125.178.2:3000/socket.io/socket.io.js"></script> 
-   <!--<script src="http://128.237.242.111:3000/socket.io/socket.io.js"></script> !-->
+   <script src="http://76.125.178.2:3000/socket.io/socket.io.js"></script>
+   <!--<script src="http://128.237.238.78:3000/socket.io/socket.io.js"></script> !--> 
+   
+   
+   <link href="game.css" rel="stylesheet" type="text/css">
+   <link href="choosePlayer.css" rel="stylesheet" type="text/css">
+   <link href='http://fonts.googleapis.com/css?family=Monda:400,700' rel='stylesheet' type='text/css'>
+   <title> 15237 Game </title>
+</head>
+<body>
+   <div id="container">
+      <div id='header'><h1>Crawler Attack</h1></div>
+      
+      <div id = 'body'>
+         <div id = 'message'>
+            <h2>To Play a Game, Please Log In or Register.</h2> 
+            <h3>To Log In, enter username, password, and click log in.</h3> 
+            <h3>To register, enter desired username, password, and click register.</h3> 
+         </div>
+         <div id = "login">
+            <form action="/login" method="post">
+               <div>
+                  <label>Username:</label>
+                  <input id="username" type="text" name="username"/>
+               </div>
+               <div>
+                  <label>Password:</label>
+                  <input id="password" type="password" name="password"/>
+               </div>
+               <div>
+                  <input class = "submitButton" type="submit" value="Log In"/>
+                  <div class = "submitButton" onclick="register()"><span>Register</span></div>
+               </div>
+            </form>
+         </div>
+         
+         <div id="choosePlayer">  
+            <button onclick="setUserID('blue', 'black', true)" id="blueButton" class="button">Blue Player</a>
+            <button onclick="setUserID('black', 'blue', true)" id="blackButton" class="button">Black Player</a>
+            <button onclick="setUserID('blue', 'black', false)" id="contBlue" class="button">Continue Blue Player</a>
+            <button onclick="setUserID('black', 'blue', false)" id="contBlack" class="button">Continue Black Player</a>
+         </div>
+      </div>
+      
+      
+      <div id='footer'> </div>
+   </div>
    <script src="Util.js"></script>
    <script src="ScaledPage.js"></script>
    <script src="game.js"></script>
    <script src="addTappableJQPlugin.js"></script>
-   <link href="game.css" rel="stylesheet" type="text/css">
-   <link href="choosePlayer.css" rel="stylesheet" type="text/css">
-   <title> 15237 Game </title>
-</head>
-<body>
-    <h2 id="message">Pick a Character</h2>   
-    <button onclick="setUserID('blue', 'black')" id="blueButton" class="button">Blue Player</a>
-    <button onclick="setUserID('black', 'blue')" id="blackButton" class="button">Black Player</a>
-    <button onclick="resetUsers()" id="resetButton" class="button">Reassign Players</a>
-    <script src="choosePlayer.js"></script>
+   <script src="choosePlayer.js"></script>
+   <script>
+      function hasSessionCookie(){
+         return getUserId() !== 'none';
+      }
+
+      function getUser() {
+         var cookieArray = document.cookie.split(';');
+         var cookies = {};
+         for (var i = 0; i < cookieArray.length; i++){
+             var parts = cookieArray[i].split('=');
+             var key = parts[0].trim();
+             var value = parts[1];
+             cookies[key] = value;
+         }
+         //user will be an id if they're logged in
+         return cookies;
+      }
+
+      function getUserId() {
+         return getUser()['user'];
+      }
+
+      function getUserName() {
+         return getUser()['name'];
+      }
+   </script>
+   
 </body>
 </html>

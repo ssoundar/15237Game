@@ -1,6 +1,6 @@
 //CHAGNETHIS: Address to server
 var address = 'http://76.125.178.2:3000/';
-//var address = 'http://128.237.242.111:3000/';
+//var address = 'http://128.237.238.78:3000/';
 
 
 //Page and Canvas Statics
@@ -55,7 +55,6 @@ var MAIN_PLAYER;
 
 Game.prototype.setup = function(){
    window.util.patchRequestAnimationFrame();
-   window.util.patchFnBind();
    this.initCanvas();
    this.map = new Map(this.page);
    this.map.initializeObjectArray();
@@ -63,6 +62,9 @@ Game.prototype.setup = function(){
    
    this.player = new Player(this.playerType, this.page, this.map, this.socket);
    this.otherPlayer = new Player(this.otherPlayerType, this.page, this.map);
+   
+   this.display = new Display(this.page, this.player);
+   
    this.socket.on('makeFirstPlayer', this.player.makeFirstPlayer.bind(this.player));
    this.socket.on('updateWithServerPosition', this.otherPlayer.updateWithServerLocation.bind(this.otherPlayer));
    this.socket.emit('checkIn',this.player.sendInfo());
@@ -109,18 +111,19 @@ Game.prototype.draw = function(timeDiff){
     this.otherPlayer.weapon.drawBullets(this.player.x - center.x, this.player.y - center.y);
     
     this.map.drawObjects(this.player.x - center.x, this.player.y - center.y);
+    this.display.draw();
     this.checkIfAlive();
 }
 
 Game.prototype.clearPage = function(){
-    this.page.fillRect(0, 0, this.width, this.height, 'black');
+    this.page.fillRect(0, 0, this.width, this.height, 'white');
 }
 
 Game.prototype.drawBackground = function(){
     var center = {x: CANVASWIDTH/2, y: CANVASHEIGHT/2,};
     this.page.fillRect(center.x - this.player.x, center.y - this.player.y,
                        Math.abs(this.player.x) + this.map.mapWidth-this.player.x, 
-                       Math.abs(this.player.y) + this.map.mapHeight-this.player.y,  'white');
+                       Math.abs(this.player.y) + this.map.mapHeight-this.player.y,  'lightblue');
 }
 
 Game.prototype.updatePlayer = function(timeDiff, x, y){
@@ -129,6 +132,7 @@ Game.prototype.updatePlayer = function(timeDiff, x, y){
     this.drawBackground();
     this.player.drawMainPlayer();
     this.player.weapon.drawBullets(x,y);
+    
 }
 
 Game.prototype.updateEnemies = function(timeDiff){
@@ -155,6 +159,25 @@ Game.prototype.endGame = function(){
     this.page.fillRect(0, 0, this.width, this.height, 'black');
 }
 
+ /********
+ * Display
+ *********/
+ var Display = function(mainPage, mainPlayer){
+   this.page = mainPage;
+   this.player = mainPlayer;
+   this.draw();
+ }
+ 
+ Display.prototype.draw = function(){
+   this.drawHealthBar();
+ }
+ 
+ Display.prototype.drawHealthBar = function(){
+   this.page.fillRoundedRect(CANVASWIDTH/2 - 200, CANVASHEIGHT - 80, 400, 60, 30, 'red');
+   this.page.strokeRoundedRect(CANVASWIDTH/2 - 200, CANVASHEIGHT - 80, 400, 60, 30, 'black', 3); 
+ }
+ 
+ 
  
  /********
  * Player
@@ -173,6 +196,7 @@ Game.prototype.endGame = function(){
     this.radius = 50;
     this.health = 100;
     this.socket = socket;
+    this.sendCounter = 0;
  }
  
  Player.prototype.sendInfo = function(){
@@ -225,7 +249,12 @@ Game.prototype.endGame = function(){
             this.y = oldy;
         }
     }
-    this.socket.emit('updatePlayerInfo', this.sendInfo());
+    this.sendCounter++;
+    if(this.sendCounter >= 5){
+      this.sendCounter = 0;
+      this.socket.emit('updatePlayerInfo', this.sendInfo());
+    }
+      
  }
  Player.prototype.updateWithServerLocation = function(data){   
     if(data.player == this.player){ 
@@ -309,6 +338,7 @@ Game.prototype.endGame = function(){
  Weapon.prototype.drawBullets = function(x,y){
       for(var i = 0; i < this.bullets.length; i++){
          this.page.fillCircle(this.bullets[i].x-x, this.bullets[i].y-y, this.bulletRadius, this.bulletColor);
+         this.page.strokeCircle(this.bullets[i].x-x, this.bullets[i].y-y, this.bulletRadius, 'black', 3);
       }
  }
  
@@ -351,14 +381,8 @@ Game.prototype.endGame = function(){
  }
  
 Control.prototype.setup = function(){
-    //if ('ontouchstart' in document.documentElement){
       this.initControllerBackground();
       this.initShootingControllerBackground();
-      //this.initControllerStick();
-    //}
-    //else{
-    //  alert("No Touch Device Found, use arrow keys and mouse instead");
-    //}
  }
 
 Control.prototype.initControllerBackground = function(){
@@ -562,6 +586,10 @@ Control.prototype.initControllerBackground = function(){
          this.objects.push(newWall1);
          this.objects.push(newWall2);
      }
+     
+     this.objects.push(new Portal(this.page, 300, 500, 500, 500));
+     
+     
      this.initializeEnemyArray();
  }
  Map.prototype.initializeEnemyArray = function(){
@@ -645,12 +673,14 @@ Control.prototype.initControllerBackground = function(){
       }
  }
  Map.prototype.updateEnemyHealthWithServer = function(enemyList){
-      
+      $("#txtmsg").text('');
+      var text = '';
       for(var i = 0; i < enemyList.length; i++){
          if(enemyList[i].health <= 0)
             this.enemies[i].health = -2;
+         text += "("+ enemyList[i].health + ", " + this.enemies[i].health + ") ";
       }
-      $("#txtmsg").text(enemyList[0].health + " " + this.enemies[0].health);
+      $("#txtmsg").text(text);
  }
  Map.prototype.addEnemy = function(type, initX, initY){
       switch(type){
@@ -719,7 +749,31 @@ MapObject.prototype.isCollision = function(circle){
  Wall.prototype.constructor = Wall;
  Wall.prototype.draw = function(){
        this.page.fillRect(this.x, this.y, this.width, this.height, this.color);
+       this.page.strokeRect(this.x, this.y, this.width, this.height, 'black', 3);
  }
+ 
+ /****************
+ *  Portals
+ *****************/ 
+ function Portal(mainPage, startX, startY, ojX, ojY){
+      this.page = mainPage;
+      this.x = startX;
+      this.y = startY;
+      this.passable = false;
+      this.ojX = ojX;
+      this.ojY = ojY;
+      this.width = 100;
+      this.height = 200;
+ }
+ 
+ Portal.prototype = new MapObject();
+ Portal.prototype.constructor = Portal;
+ Portal.prototype.draw = function(){
+       /*//this.page.fillCircle(this.x, this.y, 50, 'blue');
+       this.page.fillOval(this.x, this.y, 100, 200, 'blue');
+       this.page.fillOval(this.ojX, this.ojY, 100, 50, 'orange');*/
+ }
+ 
  
  /*****************
  * Enemies
