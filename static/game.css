@@ -21,6 +21,18 @@ html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abb
    z-index: 0;
 }
 
-#txtmsg{
-   display: none;
+
+
+#display{
+   position: fixed;
+   z-index: 2;
+   padding: 15px;
+   -moz-border-radius: 20px;
+    -webkit-border-radius: 20px;
+    border-radius: 20px;
+   background-color: #8e8e8e;
+   opacity: 0.8;
+   font-size: 25px;
+   font-weight: bold;
+   text-transform: uppercase;
 }

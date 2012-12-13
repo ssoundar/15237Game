@@ -25,3 +25,5 @@ This project implements:
 
 9) HTML: Multiple Divs used for positioning the page, along with CSS. Form to log in 
          validated at server with passport.
+
+10) Local Storage: The client side stores level and health information for the player.

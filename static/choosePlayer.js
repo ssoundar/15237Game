@@ -46,7 +46,7 @@ $(document).ready(function() {
    }
  });
 function setUserID(playerType, otherPlayer, toSet){
-   $('body').html("");
+   $('#container').hide();
    if(toSet){
       var socket;
       socket = io.connect(address);
@@ -90,12 +90,7 @@ function register(){
    }
 }
 
-function resetUsers(){
-   var socket;
-   socket = io.connect(address);
-   socket.emit('updateAvailableCharacters', 'reset');
-   location.reload();
-}
+
 
 
 

@@ -52,7 +52,7 @@ process.on("uncaughtException", onUncaughtException);
 //======================================
 
 app.post('/login',
-  passport.authenticate('local', { successRedirect: '/static/game.html',
+  passport.authenticate('local', { successRedirect: '/static/index.html',
                                    failureRedirect: '/static/loginFail.html',
                                    failureFlash: true }));
 
@@ -109,7 +109,7 @@ var CANVASHEIGHT, CANVASWIDTH;
 var availableCharacters = new Array();
 var Player = {
    player : 'black',
-   position: {x: 200, y: 200,},
+   position: {x: 100, y: 200,},
    direction: {velX: 0, velY: 0,},
    bullets: new Array(),
    health: 100,
@@ -119,7 +119,7 @@ var players = new Array();
 players.push(Player);
 var Player2 = {
    player : 'blue',
-   position: {x: 200, y: 200,},
+   position: {x: 300, y: 200,},
    direction: {velX: 0, velY: 0,},
    bullets: new Array(),
    health: 100,
@@ -127,6 +127,7 @@ var Player2 = {
 players.push(Player2);
 
 var firstPlayer;
+var gameLevel = 1;
 
 var enemies = new Array();
 
@@ -134,26 +135,14 @@ var sessToPlayerType = {};
 
 // Initialize the socket.io library
 // Start the socket.io server on port 3000
-// Remember.. this also serves the socket.io.js file!
 var io = require('socket.io').listen(3000);
 io.set('log level', 1);
 // Listen for client connection event
 // io.sockets.* is the global, *all clients* socket
 // For every client that is connected, a separate callback is called
 io.sockets.on('connection', function(socket){
-    // Listen for this client's "send" event
-    // remember, socket.* is for this particular client
-    socket.on('send', function(data) {
-        // Since io.sockets.* is the *all clients* socket,
-        // this is a broadcast message.
-        // Broadcast a "receive" event with the data received from "send"
-        // Only rebroadcast if the message is properly signed (i.e.
-        // player matches their sessionID).
-        if(idToUser[sessToId[data.sessId]].username === data.player) {
-            io.sockets.emit('receive', {player: data.player, velocity: data.velocity});
-        }
-    });
     
+    //Adds a new User
     socket.on('registerUser', function(data){
       if(usernameToId[data.username] != undefined){
          var toAdd = { id: idToUser.length, username: data.username, password: data.password, email: '' };
@@ -162,11 +151,12 @@ io.sockets.on('connection', function(socket){
       }
     });
     
+    //Set's the players session ID to a certain player type.
     socket.on('setPlayer', function(userInfo){
       sessToPlayerType[userInfo.sessId] = userInfo.playerType;
-      console.log("sessTotype" + sessToPlayerType[userInfo.sessId]);
     });
     
+    //Updates the available player types
     socket.on('updateAvailableCharacters', function(data) {
        if(data === 'reset'){
           var len = availableCharacters.length;
@@ -178,6 +168,7 @@ io.sockets.on('connection', function(socket){
        }
     });
     
+    //Used to send the available player types.
     socket.on('toggleSendAvailableCharacters', function(data) {
        if(data === true){
            var data = {
@@ -188,7 +179,7 @@ io.sockets.on('connection', function(socket){
        }
     });
     
-    
+    //Player information update
     socket.on('updatePlayerInfo', function(playerInfo){
         for(var i = 0; i < players.length; i++){
             if(players[i].player === playerInfo.player){
@@ -201,18 +192,27 @@ io.sockets.on('connection', function(socket){
         }
     });
     
+    //Canvas information update
     socket.on('updateCanvasInfo', function(canvasInfo){
          CANVASWIDTH = canvasInfo.CANVASWIDTH;
          CANVASHEIGHT = canvasInfo.CANVASHEIGHT;
     });
     
+    //Sends enemy positions to the players
     socket.on('sendEnemies', function(enemyArray){
+         console.log("Enemies length: " + enemies.length);
          if(enemies.length < 1)
             enemies = enemyArray;
+         console.log("Enemies length: " + enemies.length);
          socket.emit('updateEnemyPositionWithServer', enemies);
          socket.emit('updateEnemyHealthWithServer', enemies);
+         io.sockets.emit('getServerPosition', players[0]);
+         io.sockets.emit('getServerPosition', players[1]);
+         io.sockets.emit('updateGameLevel', gameLevel);
+         console.log("Level : " + gameLevel);
     });
     
+    //Updates enemy positions
     socket.on('updateEnemiesPosition', function(enemyList){
       if(enemies.length < 1)
          return;
@@ -227,6 +227,7 @@ io.sockets.on('connection', function(socket){
       socket.emit('updateEnemyPositionWithServer', enemies);
     });
     
+    //Updates enemy health 
     socket.on('updateEnemiesHealth', function(enemyList){
       if(enemies.length <1)
          return;
@@ -237,11 +238,43 @@ io.sockets.on('connection', function(socket){
       io.sockets.emit('updateEnemyHealthWithServer', enemies);
     });
     
+    //Assigns a first player
     socket.on('checkIn', function(playerInfo){
         if(firstPlayer == undefined || firstPlayer == 'neither'){
             firstPlayer = playerInfo.player;
             
         }
         socket.emit('makeFirstPlayer', firstPlayer);
+    });
+    
+    socket.on('changeServerLevel', function(level){
+      if(level > gameLevel)
+          gameLevel = level;
+    });
+    
+    socket.on('resetGame', function(level){
+      gameLevel = level;
+      console.log("Level2 : " + gameLevel);
+      players.splice(0,players.length);
+      var newPlayer = {
+         player : 'black',
+         position: {x: 100, y: 200,},
+         direction: {velX: 0, velY: 0,},
+         bullets: new Array(),
+         health: 100,
+      };
+      players.push(newPlayer);
+      var newPlayer2 = {
+         player : 'blue',
+         position: {x: 300, y: 200,},
+         direction: {velX: 0, velY: 0,},
+         bullets: new Array(),
+         health: 100,
+      };
+      players.push(newPlayer2);
+      
+      enemies.splice(0,enemies.length);
+      enemies = new Array();
+      io.sockets.emit('restartGame');
     });
 });

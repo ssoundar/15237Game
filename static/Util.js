@@ -39,7 +39,7 @@ window.util.patchRequestAnimationFrame = function(){
             function(fn){
                 setTimeout(function(){
                     fn(Date.now());
-                }, 1000/24);
+                }, 1000/60);
             };
 }
 
@@ -75,7 +75,7 @@ window.util.isEventSupported = (function(){
 })();
 
 window.util.makeAspectRatioCanvas = function(parent, aspectRatio){
-    var canvas = $("<canvas></canvas>");
+    var canvas = $("<canvas id = 'canvas'></canvas>");
     var calculateDims = function(aspectRatio, maxWidth, maxHeight){
         var width = Math.min(maxWidth, maxHeight*aspectRatio);
         var height = Math.min(maxHeight, maxWidth/aspectRatio);

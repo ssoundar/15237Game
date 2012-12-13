@@ -115,3 +115,23 @@ ScaledPage.prototype.fillOval = function(x, y, width, height, style){
      this.page.fill();
      this.page.closePath();	
 }
+
+ScaledPage.prototype.fillText = function(text, x, y, style){
+     this.page.fillStyle = style;
+     this.page.fillText(text, x*this.scale, y*this.scale);
+}
+
+ScaledPage.prototype.drawBackground = function(x, y, width, height){
+     x = x*this.scale;
+     y = y*this.scale;
+     width = width*this.scale;
+     height = height*this.scale;
+     var img=document.getElementById("background");
+     var imgWidth = 100*this.scale;
+     var imgHeight = 100*this.scale;
+    
+     for(var i = 0; i < Math.round(width/imgWidth); i++)
+       for(var j = 0; j < Math.round(height/imgHeight); j++)
+         this.page.drawImage(img,x + i*imgWidth,y + j*imgHeight,imgWidth,imgHeight);
+
+}

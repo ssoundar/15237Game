@@ -1,6 +1,16 @@
+/********************************************************
+This file contains all of the neccesary Objects to drive,
+and render the game. 
+*********************************************************/
 //CHAGNETHIS: Address to server
 var address = 'http://76.125.178.2:3000/';
 //var address = 'http://128.237.238.78:3000/';
+
+/********************************************************
+These are mainly defines used to change static properties,
+without having to search through the code.
+*********************************************************/
+
 
 
 //Page and Canvas Statics
@@ -37,12 +47,20 @@ var ADVANCED_CRAWLER = 2;
 var ADVANCED_CRAWLER_SPEED = 600;
 var ANGRY_CRAWLER = 3;
 var ANGRY_CRAWLER_SPEED = 100;
+
 //This game's Player
 var FIRST_PLAYER;
 var MAIN_PLAYER;
+
+//Game Statics
+var END_LEVEL = 2;
+var CURR_LEVEL = 1;
+
  /********
- * Game
+ * Game -  The main game function. This sets up the game and runs the main loop.
  ********/
+ 
+ //Constructor for Game
  var Game = function(playerType, otherPlayer) {
    this.socket = io.connect(address);
    this.socket.emit('updateAvailableCharacters', playerType);
@@ -53,20 +71,40 @@ var MAIN_PLAYER;
    window.util.deltaTimeRequestAnimationFrame(this.draw.bind(this));
 }
 
+//Setup function
 Game.prototype.setup = function(){
    window.util.patchRequestAnimationFrame();
    this.initCanvas();
-   this.map = new Map(this.page);
-   this.map.initializeObjectArray();
    
+   this.level = 1;
+   this.socket.on('updateGameLevel', this.updateGameLevel.bind(this));
+   this.map = new Map(this.page);
    
    this.player = new Player(this.playerType, this.page, this.map, this.socket);
+   
+   //Access Local Storage to retrieve last level and player info.
+   if (typeof(localStorage)!=="undefined") {
+       if(window.localStorage['Crawler Attack' + getUserId()] != undefined){
+         var str = JSON.parse(window.localStorage['Crawler Attack' + getUserId()]);
+         var str = JSON.stringify(str);
+         var data = eval('(' + str + ')');
+         this.level = data.level;
+         this.player.health = data.health;
+       }
+   }
+
+   this.map.initializeObjectArray(this.level);
+   
+   
+   
    this.otherPlayer = new Player(this.otherPlayerType, this.page, this.map);
    
    this.display = new Display(this.page, this.player);
    
+   this.socket.on('restartGame', this.restartGame.bind(this));
    this.socket.on('makeFirstPlayer', this.player.makeFirstPlayer.bind(this.player));
    this.socket.on('updateWithServerPosition', this.otherPlayer.updateWithServerLocation.bind(this.otherPlayer));
+   this.socket.on('getServerPosition', this.player.updateWithServerLocation.bind(this.player));
    this.socket.emit('checkIn',this.player.sendInfo());
    
    this.controller = new Control(this.page, this.player);
@@ -77,6 +115,8 @@ Game.prototype.setup = function(){
    
    this.body.append($('<div id = "txtmsg">Hello</div>'));
 }
+
+//Initializes the canvas
 Game.prototype.initCanvas = function(){
     this.body = $(document.body);
     this.body.width(document.body.offsetWidth);
@@ -100,19 +140,22 @@ Game.prototype.initCanvas = function(){
 /*********
 * Drawing
 *********/
+//Draws the game
 Game.prototype.draw = function(timeDiff){
-    this.clearPage();
-    var center = {x: CANVASWIDTH/2, y: CANVASHEIGHT/2,};
-    this.updatePlayer(timeDiff, this.player.x - center.x, this.player.y - center.y);
-    this.updateEnemies(timeDiff);
-    
-    
-    this.otherPlayer.drawOtherPlayer(this.player.x - center.x, this.player.y - center.y);
-    this.otherPlayer.weapon.drawBullets(this.player.x - center.x, this.player.y - center.y);
-    
-    this.map.drawObjects(this.player.x - center.x, this.player.y - center.y);
-    this.display.draw();
-    this.checkIfAlive();
+       this.clearPage();
+       var center = {x: CANVASWIDTH/2, y: CANVASHEIGHT/2,};
+       this.updatePlayer(timeDiff, this.player.x - center.x, this.player.y - center.y);
+       this.updateEnemies(timeDiff);
+       
+       
+       this.otherPlayer.drawOtherPlayer(this.player.x - center.x, this.player.y - center.y);
+       this.otherPlayer.weapon.drawBullets(this.player.x - center.x, this.player.y - center.y);
+       
+       this.map.drawObjects(this.player.x - center.x, this.player.y - center.y);
+       this.display.draw();
+       this.checkIfAlive();
+       this.checkWin();
+       CURR_LEVEL = this.level;
 }
 
 Game.prototype.clearPage = function(){
@@ -121,20 +164,24 @@ Game.prototype.clearPage = function(){
 
 Game.prototype.drawBackground = function(){
     var center = {x: CANVASWIDTH/2, y: CANVASHEIGHT/2,};
-    this.page.fillRect(center.x - this.player.x, center.y - this.player.y,
+    /*this.page.fillRect(center.x - this.player.x, center.y - this.player.y,
                        Math.abs(this.player.x) + this.map.mapWidth-this.player.x, 
-                       Math.abs(this.player.y) + this.map.mapHeight-this.player.y,  'lightblue');
+                       Math.abs(this.player.y) + this.map.mapHeight-this.player.y,  'lightblue');*/
+    this.page.drawBackground(center.x - this.player.x, center.y - this.player.y,
+                       Math.abs(this.player.x) + this.map.mapWidth-this.player.x, 
+                       Math.abs(this.player.y) + this.map.mapHeight-this.player.y);
 }
 
+//Updates the player's information
 Game.prototype.updatePlayer = function(timeDiff, x, y){
     this.player.weapon.updateBulletsLocation(timeDiff);
     this.player.updateLocation(timeDiff);
     this.drawBackground();
     this.player.drawMainPlayer();
     this.player.weapon.drawBullets(x,y);
-    
 }
 
+//Update enemy information
 Game.prototype.updateEnemies = function(timeDiff){
     var enemies = this.map.enemies;
     var noneKilled = true;
@@ -155,16 +202,91 @@ Game.prototype.checkIfAlive = function(){
       this.endGame();
 }
 
+Game.prototype.checkWin = function(){
+    var enemies = this.map.enemies;
+    for(var i = 0; i < enemies.length; i++){
+        if(enemies[i].health != -2){
+            return;
+        }
+    }
+    if(this.level < END_LEVEL){
+      this.level++;
+      if (typeof(localStorage)!=="undefined") {
+         var data = {
+            level: this.level,
+            health: this.player.health,
+         };
+         window.localStorage['Crawler Attack' + getUserId()] = JSON.stringify(data);
+      }
+      this.socket.emit('changeServerLevel', this.level);
+    }
+      
+    
+      
+    if(this.level == END_LEVEL)
+      this.winGame();
+    else
+      this.map.initializeObjectArray(this.level);
+      
+    
+}
+
 Game.prototype.endGame = function(){
-    this.page.fillRect(0, 0, this.width, this.height, 'black');
+    //this.page.fillRect(0, 0, this.width, this.height, 'black');
+    function down(){};
+    function up(){};
+    function move(){};
+    $("#display").ontap(down, up, this.resetGame.bind(this), move);
+    $("#display").show();
+    $("#display").text("One of you died. Tap here to reset.");
+}
+
+Game.prototype.winGame = function(){
+    //this.page.fillRect(0, 0, this.width, this.height, 'black');
+    function down(){};
+    function up(){};
+    function move(){};
+    $("#display").ontap(down, up, this.resetGame.bind(this), move);
+    $("#display").show();
+    $("#display").text("You two Won. Tap here to reset.");
+}
+
+Game.prototype.updateGameLevel = function(level){
+   this.level = level;
+}
+
+Game.prototype.resetGame = function(){
+   var level = this.level;
+   if(this.level == END_LEVEL){
+      level = 1;
+      if (typeof(localStorage)!=="undefined") {
+         var data = {
+            level: level,
+            health: 100,
+         };
+         window.localStorage['Crawler Attack' + getUserId()] = JSON.stringify(data);
+      }
+   }
+   this.socket.emit('resetGame', level);
+}
+
+Game.prototype.restartGame = function(){
+   location.reload();
 }
 
  /********
  * Display
  *********/
+ //Mainly used to display player info to the player.
  var Display = function(mainPage, mainPlayer){
    this.page = mainPage;
    this.player = mainPlayer;
+   var display = $('<div id = "display">Hello</div>');
+   display.css('left', WIDTH/2);
+   display.css('top', HEIGHT/2);
+   display.hide();
+   $("body").append(display);
+   
    this.draw();
  }
  
@@ -173,7 +295,8 @@ Game.prototype.endGame = function(){
  }
  
  Display.prototype.drawHealthBar = function(){
-   this.page.fillRoundedRect(CANVASWIDTH/2 - 200, CANVASHEIGHT - 80, 400, 60, 30, 'red');
+   if(this.player.health > 0)
+      this.page.fillRoundedRect(CANVASWIDTH/2 - 200, CANVASHEIGHT - 80, this.player.health*4, 60, 30, 'red');
    this.page.strokeRoundedRect(CANVASWIDTH/2 - 200, CANVASHEIGHT - 80, 400, 60, 30, 'black', 3); 
  }
  
@@ -182,7 +305,7 @@ Game.prototype.endGame = function(){
  /********
  * Player
  ********/
- 
+ //This is the player object. It stores all relevant player information
  var Player = function(playerType, page, map, socket) {
     this.player = playerType;
     this.page = page;
@@ -250,7 +373,7 @@ Game.prototype.endGame = function(){
         }
     }
     this.sendCounter++;
-    if(this.sendCounter >= 5){
+    if(this.sendCounter >= 10){
       this.sendCounter = 0;
       this.socket.emit('updatePlayerInfo', this.sendInfo());
     }
@@ -275,11 +398,23 @@ Game.prototype.endGame = function(){
  }
  
  Player.prototype.drawOtherPlayer = function(x,y){
-    this.page.fillCircle(this.x-x, this.y-y, this.radius, this.player);
+    var color;
+    if(this.player == 'blue')
+      color = 'blue';
+    else
+      color = 'grey';
+    this.page.fillCircle(this.x-x, this.y-y, this.radius, color);
+    this.page.strokeCircle(this.x-x, this.y-y, this.radius, 'black', 3);
  }
  
   Player.prototype.drawMainPlayer = function(){
-    this.page.fillCircle(CANVASWIDTH/2, CANVASHEIGHT/2, this.radius, this.player);
+    var color;
+    if(this.player == 'blue')
+      color = 'blue';
+    else
+      color = 'grey';
+    this.page.fillCircle(CANVASWIDTH/2, CANVASHEIGHT/2, this.radius, color);
+    this.page.strokeCircle(CANVASWIDTH/2, CANVASHEIGHT/2, this.radius, 'black', 3);
  }
  
  Player.prototype.boundingCircle = function(){
@@ -293,8 +428,10 @@ Game.prototype.endGame = function(){
  
  
  Player.prototype.hitEnemy = function(obj){
-    this.health -= obj.damage;
-    obj.health = -1;
+    if(this.health > 0){
+       this.health -= obj.damage;
+       obj.health = -1;
+    }
  }
  
  Player.prototype.makeFirstPlayer = function(player){
@@ -304,9 +441,11 @@ Game.prototype.endGame = function(){
     else
       this.first = false;
  }
+ 
  /*******************
  * Weapon
  ******************/
+ //This is the weapon object. This controls all weapon properties.
  var Weapon = function(mainPage, mainPlayer, map){
      this.page = mainPage;
      this.player = mainPlayer;
@@ -372,7 +511,7 @@ Game.prototype.endGame = function(){
  /*******************
  * Movement Control
  *******************/
- 
+ //This is my custom UI for controlling the player and shooting.
  var Control = function(mainPage, mainPlayer) {
     this.player = mainPlayer;
     this.page = mainPage;
@@ -555,9 +694,11 @@ Control.prototype.initControllerBackground = function(){
     this.stopPlayer();
     this.stopShooting(); 
  }
+ 
  /*******************
  * Map
  *******************/
+ //This object stores all relevant map information
  var Map = function(mainPage){
      this.page = mainPage;
      this.objects = new Array();
@@ -566,38 +707,44 @@ Control.prototype.initControllerBackground = function(){
      this.mapHeight = MAP_HEIGHT;
  }
  
- Map.prototype.initializeObjectArray = function(){
-     var opening = 400;
-     var frequency = 400;
-     var edgeWall1 = new Wall(this.page, 0, 0, HORIZONTAL, this.mapWidth, EDGE_COLOR);
-     var edgeWall2 = new Wall(this.page, 0, this.mapHeight - WALL_THICKNESS, HORIZONTAL, this.mapWidth, EDGE_COLOR);
-     var edgeWall3 = new Wall(this.page, 0, 0, VERTICAL, this.mapHeight, EDGE_COLOR);
-     var edgeWall4 = new Wall(this.page, this.mapWidth - WALL_THICKNESS, 0, VERTICAL, this.mapHeight, EDGE_COLOR);
+ Map.prototype.initializeObjectArray = function(level){
+     this.objects.splice(0,this.objects.length);
+     if(level === 1){
+        var opening = 400;
+        var frequency = 400;
+        var edgeWall1 = new Wall(this.page, 0, 0, HORIZONTAL, this.mapWidth, EDGE_COLOR);
+        var edgeWall2 = new Wall(this.page, 0, this.mapHeight - WALL_THICKNESS, HORIZONTAL, this.mapWidth, EDGE_COLOR);
+        var edgeWall3 = new Wall(this.page, 0, 0, VERTICAL, this.mapHeight, EDGE_COLOR);
+        var edgeWall4 = new Wall(this.page, this.mapWidth - WALL_THICKNESS, 0, VERTICAL, this.mapHeight, EDGE_COLOR);
+        
+        this.objects.push(edgeWall1);
+        this.objects.push(edgeWall2);
+        this.objects.push(edgeWall3);
+        this.objects.push(edgeWall4);
+        var startWidth = frequency;
+        while(startWidth < this.mapWidth - frequency){
+            var newWall1 = new Wall(this.page, startWidth, 0, VERTICAL, this.mapHeight - opening, EDGE_COLOR);
+            var newWall2 = new Wall(this.page, startWidth+frequency, opening, VERTICAL, this.mapHeight - opening, EDGE_COLOR);
+            startWidth += 2*frequency;
+            this.objects.push(newWall1);
+            this.objects.push(newWall2);
+        }
+        
+        //this.objects.push(new Portal(this.page, 300, 500, 500, 500));
+      }
      
-     this.objects.push(edgeWall1);
-     this.objects.push(edgeWall2);
-     this.objects.push(edgeWall3);
-     this.objects.push(edgeWall4);
-     var startWidth = frequency;
-     while(startWidth < this.mapWidth - frequency){
-         var newWall1 = new Wall(this.page, startWidth, 0, VERTICAL, this.mapHeight - opening, EDGE_COLOR);
-         var newWall2 = new Wall(this.page, startWidth+frequency, opening, VERTICAL, this.mapHeight - opening, EDGE_COLOR);
-         startWidth += 2*frequency;
-         this.objects.push(newWall1);
-         this.objects.push(newWall2);
-     }
      
-     this.objects.push(new Portal(this.page, 300, 500, 500, 500));
-     
-     
-     this.initializeEnemyArray();
+     this.initializeEnemyArray(level);
  }
- Map.prototype.initializeEnemyArray = function(){
-     this.addEnemy(SIMPLE_CRAWLER, 600, 500);
-     this.addEnemy(SIMPLE_CRAWLER, 700, 500);
-     this.addEnemy(SIMPLE_CRAWLER, 500, 100);
-     this.addEnemy(ADVANCED_CRAWLER, 600, 200);
-     this.addEnemy(ANGRY_CRAWLER, 900, 200);
+ Map.prototype.initializeEnemyArray = function(level){
+      this.enemies.splice(0,this.enemies.length);
+      if(level === 1){
+        this.addEnemy(SIMPLE_CRAWLER, 600, 500);
+        this.addEnemy(SIMPLE_CRAWLER, 700, 500);
+        this.addEnemy(SIMPLE_CRAWLER, 500, 100);
+        this.addEnemy(ADVANCED_CRAWLER, 600, 200);
+        this.addEnemy(ANGRY_CRAWLER, 900, 200);
+      }
  }
  Map.prototype.drawObjects = function(x,y){
       for(var i = 0; i < this.objects.length; i++){
@@ -673,14 +820,14 @@ Control.prototype.initControllerBackground = function(){
       }
  }
  Map.prototype.updateEnemyHealthWithServer = function(enemyList){
-      $("#txtmsg").text('');
       var text = '';
       for(var i = 0; i < enemyList.length; i++){
-         if(enemyList[i].health <= 0)
+         if(enemyList[i].health <= 0 && this.enemies[i] != undefined){
             this.enemies[i].health = -2;
-         text += "("+ enemyList[i].health + ", " + this.enemies[i].health + ") ";
+            text += "("+ enemyList[i].health + ", " + this.enemies[i].health + ") ";
+         }
+         
       }
-      $("#txtmsg").text(text);
  }
  Map.prototype.addEnemy = function(type, initX, initY){
       switch(type){
@@ -695,10 +842,11 @@ Control.prototype.initControllerBackground = function(){
                      break;
       }
  }
+ 
  /*****************
  *  Map Objects
  *****************/
- 
+ //This is a base object for building more Map Objects.
 function MapObject(mainPage, initX, initY){
       this.page = mainPage;
       this.x = initX;
@@ -728,6 +876,7 @@ MapObject.prototype.isCollision = function(circle){
  /**************
  * Wall
  **************/
+ //Wall Object
  function Wall(mainPage, initX, initY, orientation, length, color){
       this.page = mainPage;
       this.x = initX;
@@ -755,6 +904,7 @@ MapObject.prototype.isCollision = function(circle){
  /****************
  *  Portals
  *****************/ 
+ //Portal Object
  function Portal(mainPage, startX, startY, ojX, ojY){
       this.page = mainPage;
       this.x = startX;
@@ -778,6 +928,7 @@ MapObject.prototype.isCollision = function(circle){
  /*****************
  * Enemies
  *****************/
+ //Base Object to make more enemies
   function Enemy(mainPage, initX, initY){
       this.page = mainPage;
       this.x = initX;
@@ -794,8 +945,10 @@ MapObject.prototype.isCollision = function(circle){
  Enemy.prototype = new MapObject();
  Enemy.prototype.constructor = Enemy;
  Enemy.prototype.draw = function(){
-      if(this.health > 0)
-       this.page.fillCircle(this.x, this.y, this.radius, this.color);
+      if(this.health > 0){
+          this.page.fillCircle(this.x, this.y, this.radius, this.color);
+          this.page.strokeCircle(this.x, this.y, this.radius, 'black', 3);
+      }
  }
  Enemy.prototype.isCollision = function(circle){
       if(this.health <= 0)
@@ -821,6 +974,7 @@ MapObject.prototype.isCollision = function(circle){
  /****************
  * Simple Crawler
  ****************/
+ //Simple enemy that move slowly to nearest player
  function SimpleCrawler(mainPage, initX, initY){
       this.type = SIMPLE_CRAWLER;
       this.page = mainPage;
@@ -895,6 +1049,8 @@ MapObject.prototype.isCollision = function(circle){
  /*****************
  * Advanced Crawler
  ******************/
+ //More Complex enemy inheriting from the SimpleCrawler
+ //This moves after as it gets closer to the player.
  function AdvancedCrawler(mainPage, initX, initY){
       this.type = SIMPLE_CRAWLER;
       this.page = mainPage;
@@ -926,6 +1082,8 @@ MapObject.prototype.isCollision = function(circle){
  /*****************
  * Angry Crawler
  ******************/
+ //Another Advanced Crawler that gets faster as it's health drops
+ //It's damage is based off its health when it strikes the player.
  function AngryCrawler(mainPage, initX, initY){
       this.type = SIMPLE_CRAWLER;
       this.page = mainPage;
