@@ -127,11 +127,61 @@ ScaledPage.prototype.drawBackground = function(x, y, width, height){
      width = width*this.scale;
      height = height*this.scale;
      var img=document.getElementById("background");
-     var imgWidth = 100*this.scale;
-     var imgHeight = 100*this.scale;
+     var imgWidth = 500*this.scale;
+     var imgHeight = 500*this.scale;
     
      for(var i = 0; i < Math.round(width/imgWidth); i++)
        for(var j = 0; j < Math.round(height/imgHeight); j++)
          this.page.drawImage(img,x + i*imgWidth,y + j*imgHeight,imgWidth,imgHeight);
 
+}
+
+ScaledPage.prototype.drawBlackPlayer = function(x, y, xDir, yDir){
+    var rotation = Math.atan2(yDir*this.scale, xDir*this.scale) + Math.PI/2;
+    x = x*this.scale;
+    y = y*this.scale;
+    
+    this.page.save();
+
+    this.page.translate(x,y);
+    this.page.rotate(rotation);
+     
+    var img=document.getElementById("blackPlayer");
+    var imgWidth = 210*this.scale;
+    var imgHeight = 210*this.scale;
+    this.page.drawImage(img, 0 - imgWidth/2, 0 - imgHeight/2, imgWidth, imgHeight);
+    this.page.restore();
+}
+
+ScaledPage.prototype.drawBluePlayer = function(x, y, xDir, yDir){
+    var rotation = Math.atan2(yDir*this.scale, xDir*this.scale) + Math.PI/2;
+    x = x*this.scale;
+    y = y*this.scale;
+    
+    this.page.save();
+
+    this.page.translate(x,y);
+    this.page.rotate(rotation);
+
+    var img=document.getElementById("bluePlayer");
+    var imgWidth = 210*this.scale;
+    var imgHeight = 210*this.scale;
+    this.page.drawImage(img, 0 - imgWidth/2, 0 - imgHeight/2, imgWidth, imgHeight);
+    this.page.restore();
+}
+
+ScaledPage.prototype.drawCrawler = function(x, y, xDir, yDir, crawler){
+    var rotation = Math.atan2(yDir*this.scale, xDir*this.scale) + Math.PI/2;
+    x = x*this.scale;
+    y = y*this.scale;
+    
+    this.page.save();
+
+    this.page.translate(x,y);
+    this.page.rotate(rotation);
+
+    var imgWidth = 210*this.scale;
+    var imgHeight = 210*this.scale;
+    this.page.drawImage(crawler, 0 - imgWidth/2, 0 - imgHeight/2, imgWidth, imgHeight);
+    this.page.restore();
 }

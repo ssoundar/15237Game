@@ -8,6 +8,7 @@ $(document).ready(function() {
    if(hasSessionCookie()){
       $('#login').hide();
       $('#choosePlayer').show();
+      $('#faq').hide();
       var sessId = getUserId();
       var socket;
       socket = io.connect(address);
@@ -88,6 +89,20 @@ function register(){
    }else{
       $("#message").html('<h2>There is a problem:'+problems+'</h2>');
    }
+}
+
+function viewFaq(){
+   $('#choosePlayer').hide();
+   $('#login').hide();
+   $('#message').hide();
+   $('#faq').show();
+}
+
+function goBack(){
+   $('#choosePlayer').show();
+   $('#login').hide();
+   $('#message').show();
+   $('#faq').hide();
 }
 
 

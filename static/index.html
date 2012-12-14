@@ -14,11 +14,17 @@
    <title> 15237 Game </title>
 </head>
 <body>
+   <img id="background" src="background.jpg">
+   <img id="blackPlayer" src="player.png">
+   <img id="bluePlayer" src="player2.png">
+   <img id="simpleCrawler" src="simpleCrawler.png">
+   <img id="angryCrawler" src="angryCrawler.png">
+   <img id="advancedCrawler" src="advancedCrawler.png">
    <div id="container">
       <div id='header'><h1>Crawler Attack</h1></div>
       
       <div id = 'body'>
-         <img id="background" src="background.png">
+         
          <div id = 'message'>
             <h2>To Play a Game, Please Log In or Register.</h2> 
             <h3>To Log In, enter username, password, and click log in.</h3> 
@@ -42,15 +48,26 @@
          </div>
          
          <div id="choosePlayer">  
-            <button onclick="setUserID('blue', 'black', true)" id="blueButton" class="button">Blue Player</a>
-            <button onclick="setUserID('black', 'blue', true)" id="blackButton" class="button">Black Player</a>
-            <button onclick="setUserID('blue', 'black', false)" id="contBlue" class="button">Continue Blue Player</a>
-            <button onclick="setUserID('black', 'blue', false)" id="contBlack" class="button">Continue Black Player</a>
+            <button onclick="setUserID('blue', 'black', true)" id="blueButton" class="button">Blue Player</button>
+            <button onclick="setUserID('black', 'blue', true)" id="blackButton" class="button">Black Player</button>
+            <button onclick="setUserID('blue', 'black', false)" id="contBlue" class="button">Continue Blue Player</button>
+            <button onclick="setUserID('black', 'blue', false)" id="contBlack" class="button">Continue Black Player</button>
+            <button onclick="viewFaq()" id="faqButton" class="button">View FAQ</button>
+         </div>
+         
+         <div id = 'faq'>
+            <button onclick="goBack()" id="backButton" class="button">Go Back</button>
+            <hr></hr>
+            <h2> Controls </h2>
+            <h3> In game use the left gray circle to move, the right to shoot. </h3>
+            <h2> Objective </h2>
+            <h3> Try to kill all the enemies in each level to win. </h3>
+            <h3> Each enemy type has something special about them. Try to figure out what it is.</h3>
          </div>
       </div>
+      Sprites by Bladebuddy.
       
-      
-      <div id='footer'> </div>
+      <div id='footer'></div>
    </div>
    <script src="Util.js"></script>
    <script src="ScaledPage.js"></script>

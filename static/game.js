@@ -28,7 +28,7 @@ var MAG_EPSILON = 0.0001;
 var PISTOL = 0;
 var PISTOLBULLETSPEED = 15;
 var PISTOLSHOOTINGSPEED = 300;
-var PISTOLBULLETRADIUS = 15;
+var PISTOLBULLETRADIUS = 8;
 var PISTOLDAMAGE = 10;
 //Map Objects Statics
 var HORIZONTAL = 'horizontal';
@@ -38,7 +38,7 @@ var EDGE_COLOR = 'rgb(65,105,225)'
 
 //Map statics
 var MAP_WIDTH = 2000;
-var MAP_HEIGHT = 1000;
+var MAP_HEIGHT = 2000;
 
 //Enemy Statics
 var SIMPLE_CRAWLER = 1;
@@ -53,7 +53,7 @@ var FIRST_PLAYER;
 var MAIN_PLAYER;
 
 //Game Statics
-var END_LEVEL = 2;
+var END_LEVEL = 3;
 var CURR_LEVEL = 1;
 
  /********
@@ -75,7 +75,7 @@ var CURR_LEVEL = 1;
 Game.prototype.setup = function(){
    window.util.patchRequestAnimationFrame();
    this.initCanvas();
-   
+   this.RUNNING = true;
    this.level = 1;
    this.socket.on('updateGameLevel', this.updateGameLevel.bind(this));
    this.map = new Map(this.page);
@@ -105,6 +105,7 @@ Game.prototype.setup = function(){
    this.socket.on('makeFirstPlayer', this.player.makeFirstPlayer.bind(this.player));
    this.socket.on('updateWithServerPosition', this.otherPlayer.updateWithServerLocation.bind(this.otherPlayer));
    this.socket.on('getServerPosition', this.player.updateWithServerLocation.bind(this.player));
+   this.socket.on('goToLevel', this.goToLevel.bind(this));
    this.socket.emit('checkIn',this.player.sendInfo());
    
    this.controller = new Control(this.page, this.player);
@@ -113,7 +114,7 @@ Game.prototype.setup = function(){
    this.socket.on('updateEnemyHealthWithServer', this.map.updateEnemyHealthWithServer.bind(this.map));
    this.socket.emit('sendEnemies',this.map.getEnemyList());
    
-   this.body.append($('<div id = "txtmsg">Hello</div>'));
+   this.body.append($('<div id = "txtmsg"></div>'));
 }
 
 //Initializes the canvas
@@ -142,20 +143,27 @@ Game.prototype.initCanvas = function(){
 *********/
 //Draws the game
 Game.prototype.draw = function(timeDiff){
-       this.clearPage();
-       var center = {x: CANVASWIDTH/2, y: CANVASHEIGHT/2,};
-       this.updatePlayer(timeDiff, this.player.x - center.x, this.player.y - center.y);
-       this.updateEnemies(timeDiff);
+        if(this.RUNNING){
+          var center = {x: CANVASWIDTH/2, y: CANVASHEIGHT/2,};
+          var x = this.player.x - center.x;
+          var y = this.player.y - center.y;
+          this.updatePlayer(timeDiff, x,y);
+          this.updateEnemies(timeDiff);
        
-       
-       this.otherPlayer.drawOtherPlayer(this.player.x - center.x, this.player.y - center.y);
-       this.otherPlayer.weapon.drawBullets(this.player.x - center.x, this.player.y - center.y);
-       
-       this.map.drawObjects(this.player.x - center.x, this.player.y - center.y);
-       this.display.draw();
-       this.checkIfAlive();
-       this.checkWin();
-       CURR_LEVEL = this.level;
+      
+          this.clearPage();
+          this.drawBackground();
+          this.player.drawMainPlayer();
+          this.player.weapon.drawBullets(x,y);
+          this.otherPlayer.drawOtherPlayer(this.player.x - center.x, this.player.y - center.y);
+          this.otherPlayer.weapon.drawBullets(this.player.x - center.x, this.player.y - center.y);
+          this.map.drawObjects(this.player.x - center.x, this.player.y - center.y);
+          this.display.draw();
+          
+          this.checkIfAlive();
+          this.checkWin();
+          CURR_LEVEL = this.level;
+      }
 }
 
 Game.prototype.clearPage = function(){
@@ -176,9 +184,6 @@ Game.prototype.drawBackground = function(){
 Game.prototype.updatePlayer = function(timeDiff, x, y){
     this.player.weapon.updateBulletsLocation(timeDiff);
     this.player.updateLocation(timeDiff);
-    this.drawBackground();
-    this.player.drawMainPlayer();
-    this.player.weapon.drawBullets(x,y);
 }
 
 //Update enemy information
@@ -218,21 +223,25 @@ Game.prototype.checkWin = function(){
          };
          window.localStorage['Crawler Attack' + getUserId()] = JSON.stringify(data);
       }
-      this.socket.emit('changeServerLevel', this.level);
+      
     }
       
     
       
-    if(this.level == END_LEVEL)
+    if(this.level == END_LEVEL && this.player.health > 0)
       this.winGame();
-    else
-      this.map.initializeObjectArray(this.level);
+    else if(this.player.health < 0){
+      this.endGame();
+    }else{
+      this.socket.emit('changeServerLevel', this.level);
+    }
       
     
 }
 
 Game.prototype.endGame = function(){
     //this.page.fillRect(0, 0, this.width, this.height, 'black');
+    this.RUNNING = false;
     function down(){};
     function up(){};
     function move(){};
@@ -243,6 +252,7 @@ Game.prototype.endGame = function(){
 
 Game.prototype.winGame = function(){
     //this.page.fillRect(0, 0, this.width, this.height, 'black');
+    this.RUNNING = false;
     function down(){};
     function up(){};
     function move(){};
@@ -257,21 +267,38 @@ Game.prototype.updateGameLevel = function(level){
 
 Game.prototype.resetGame = function(){
    var level = this.level;
+   //alert("once");
+   
    if(this.level == END_LEVEL){
       level = 1;
-      if (typeof(localStorage)!=="undefined") {
+   }
+   this.socket.emit('resetGame', level);
+}
+
+Game.prototype.restartGame = function(level){
+   if (typeof(localStorage)!=="undefined") {
          var data = {
             level: level,
             health: 100,
          };
          window.localStorage['Crawler Attack' + getUserId()] = JSON.stringify(data);
-      }
    }
-   this.socket.emit('resetGame', level);
+   location.reload();
 }
 
-Game.prototype.restartGame = function(){
-   location.reload();
+Game.prototype.goToLevel = function(level){
+   this.level = level;
+   if(this.player.player == 'black'){
+         this.player.x = 100;
+         this.player.y = 200;
+   }
+   if(this.player.player == 'blue'){
+         this.player.x = 100;
+         this.player.y = 200;
+   }
+   this.socket.emit('updatePlayerInfo', this.player.sendInfo());
+   this.map.initializeObjectArray(this.level);
+   this.socket.emit('sendEnemies',this.map.getEnemyList());
 }
 
  /********
@@ -329,6 +356,7 @@ Game.prototype.restartGame = function(){
        direction: {velX: this.velX, velY: this.velY},
        bullets: this.weapon.bullets,
        health: this.health,
+       facingDirection: this.facingDirection,
     };
  }
  
@@ -394,27 +422,24 @@ Game.prototype.restartGame = function(){
        if(this.y > this.map.mapHeight - radius)
          this.y = this.map.mapHeight - radius;
        this.health = data.health;
+       
+       this.facingDirection = data.facingDirection;
     }
  }
  
  Player.prototype.drawOtherPlayer = function(x,y){
-    var color;
+    
     if(this.player == 'blue')
-      color = 'blue';
-    else
-      color = 'grey';
-    this.page.fillCircle(this.x-x, this.y-y, this.radius, color);
-    this.page.strokeCircle(this.x-x, this.y-y, this.radius, 'black', 3);
+      this.page.drawBluePlayer(this.x-x, this.y-y, this.facingDirection.xVel, this.facingDirection.yVel);
+    if(this.player == 'black')
+      this.page.drawBlackPlayer(this.x-x, this.y-y, this.facingDirection.xVel, this.facingDirection.yVel);
  }
  
   Player.prototype.drawMainPlayer = function(){
-    var color;
     if(this.player == 'blue')
-      color = 'blue';
-    else
-      color = 'grey';
-    this.page.fillCircle(CANVASWIDTH/2, CANVASHEIGHT/2, this.radius, color);
-    this.page.strokeCircle(CANVASWIDTH/2, CANVASHEIGHT/2, this.radius, 'black', 3);
+      this.page.drawBluePlayer(CANVASWIDTH/2,CANVASHEIGHT/2,this.facingDirection.xVel, this.facingDirection.yVel);
+    if(this.player == 'black')
+      this.page.drawBlackPlayer(CANVASWIDTH/2,CANVASHEIGHT/2,this.facingDirection.xVel, this.facingDirection.yVel);
  }
  
  Player.prototype.boundingCircle = function(){
@@ -709,6 +734,7 @@ Control.prototype.initControllerBackground = function(){
  
  Map.prototype.initializeObjectArray = function(level){
      this.objects.splice(0,this.objects.length);
+     this.objects = new Array();
      if(level === 1){
         var opening = 400;
         var frequency = 400;
@@ -729,8 +755,17 @@ Control.prototype.initControllerBackground = function(){
             this.objects.push(newWall1);
             this.objects.push(newWall2);
         }
+
+      }
+      
+      if(level === 2){
+         this.objects.push(new Wall(this.page, 0, 500, HORIZONTAL, 400, EDGE_COLOR));
+         this.objects.push(new Wall(this.page, 300, 1050, HORIZONTAL, 500, EDGE_COLOR));
+         this.objects.push(new Wall(this.page, 500, 1500, HORIZONTAL, 1000, EDGE_COLOR));
         
-        //this.objects.push(new Portal(this.page, 300, 500, 500, 500));
+         this.objects.push(new Wall(this.page, 400, 0, VERTICAL, 300, EDGE_COLOR));
+         this.objects.push(new Wall(this.page, 1000, 200, VERTICAL, 1000, EDGE_COLOR));
+         this.objects.push(new Wall(this.page, 1300, 600, VERTICAL, 600, EDGE_COLOR));
       }
      
      
@@ -738,12 +773,35 @@ Control.prototype.initControllerBackground = function(){
  }
  Map.prototype.initializeEnemyArray = function(level){
       this.enemies.splice(0,this.enemies.length);
+      this.enemies = new Array();
       if(level === 1){
         this.addEnemy(SIMPLE_CRAWLER, 600, 500);
-        this.addEnemy(SIMPLE_CRAWLER, 700, 500);
+        /*this.addEnemy(SIMPLE_CRAWLER, 700, 500);
         this.addEnemy(SIMPLE_CRAWLER, 500, 100);
         this.addEnemy(ADVANCED_CRAWLER, 600, 200);
         this.addEnemy(ANGRY_CRAWLER, 900, 200);
+        
+        this.addEnemy(SIMPLE_CRAWLER, 900, 1700);
+        this.addEnemy(SIMPLE_CRAWLER, 1000, 500);
+        this.addEnemy(ADVANCED_CRAWLER, 1100, 1800);
+        this.addEnemy(ADVANCED_CRAWLER, 1200, 1900);
+        this.addEnemy(ANGRY_CRAWLER, 1300, 1600);*/
+      }
+      if(level === 2){
+        this.addEnemy(SIMPLE_CRAWLER, 600, 600);
+        /*this.addEnemy(SIMPLE_CRAWLER, 700, 700);
+        this.addEnemy(SIMPLE_CRAWLER, 500, 800);
+        this.addEnemy(ADVANCED_CRAWLER, 600, 900);
+        this.addEnemy(ANGRY_CRAWLER, 300, 900);
+        
+        this.addEnemy(SIMPLE_CRAWLER, 200, 1700);
+        this.addEnemy(SIMPLE_CRAWLER, 300, 1100);
+        this.addEnemy(ADVANCED_CRAWLER, 400, 1200);
+        this.addEnemy(ADVANCED_CRAWLER, 500, 1300);
+        this.addEnemy(ANGRY_CRAWLER, 600, 1400);
+        
+        this.addEnemy(ADVANCED_CRAWLER, 1100, 800);
+        this.addEnemy(ANGRY_CRAWLER, 1200, 200);*/
       }
  }
  Map.prototype.drawObjects = function(x,y){
@@ -933,7 +991,7 @@ MapObject.prototype.isCollision = function(circle){
       this.page = mainPage;
       this.x = initX;
       this.y = initY;
-      this.radius = 10;
+      this.radius = 20;
       this.color = 'red';
       this.damage = 200;
       this.health = 20;
@@ -980,12 +1038,15 @@ MapObject.prototype.isCollision = function(circle){
       this.page = mainPage;
       this.x = initX;
       this.y = initY;
-      this.radius = 25;
+      this.radius = 40;
       this.color = 'lightgreen';
-      this.damage = 5;
+      this.damage = 500;
       this.health = 20;
       this.moveSpeed = SIMPLE_CRAWLER_SPEED;
       this.movement = true;
+      this.crawlerImg = document.getElementById("simpleCrawler");
+      this.velX = 0.0;
+      this.velY = 0.0;
  }
  SimpleCrawler.prototype = new Enemy();
  SimpleCrawler.prototype.constructor = SimpleCrawler;
@@ -1044,8 +1105,13 @@ MapObject.prototype.isCollision = function(circle){
        if(collisionRet.collided){
            this.y = oldy;
        }
+       this.velX = velX;
+       this.velY = velY;
  }
- 
+ SimpleCrawler.prototype.draw = function(){
+      if(this.health > 0)
+      this.page.drawCrawler(this.x, this.y, this.velX, this.velY, this.crawlerImg);
+ }
  /*****************
  * Advanced Crawler
  ******************/
@@ -1056,12 +1122,13 @@ MapObject.prototype.isCollision = function(circle){
       this.page = mainPage;
       this.x = initX;
       this.y = initY;
-      this.radius = 25;
+      this.radius = 40;
       this.color = 'orange';
       this.damage = 10;
       this.health = 30;
       this.moveSpeed = ADVANCED_CRAWLER_SPEED;
       this.movement = true;
+      this.crawlerImg = document.getElementById("advancedCrawler");
  }
  AdvancedCrawler.prototype = new SimpleCrawler();
  AdvancedCrawler.prototype.constructor = AdvancedCrawler;
@@ -1089,12 +1156,13 @@ MapObject.prototype.isCollision = function(circle){
       this.page = mainPage;
       this.x = initX;
       this.y = initY;
-      this.radius = 25;
+      this.radius = 40;
       this.color = 'pink';
       this.damage = 4;
       this.health = 20;
       this.moveSpeed = ANGRY_CRAWLER_SPEED;
       this.movement = true;
+      this.crawlerImg = document.getElementById("angryCrawler");
  }
  AngryCrawler.prototype = new SimpleCrawler();
  AngryCrawler.prototype.constructor = AngryCrawler;

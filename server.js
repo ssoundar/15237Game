@@ -113,6 +113,7 @@ var Player = {
    direction: {velX: 0, velY: 0,},
    bullets: new Array(),
    health: 100,
+   facingDirection: {xVel: 0, yVel: 0,},
 };
 
 var players = new Array();
@@ -123,6 +124,7 @@ var Player2 = {
    direction: {velX: 0, velY: 0,},
    bullets: new Array(),
    health: 100,
+   facingDirection: {xVel: 0, yVel: 0,},
 };
 players.push(Player2);
 
@@ -187,8 +189,9 @@ io.sockets.on('connection', function(socket){
                players[i].direction = playerInfo.direction;
                players[i].bullets = playerInfo.bullets;
                players[i].health = playerInfo.health;
+               players[i].facingDirection = playerInfo.facingDirection;
             }
-            io.sockets.emit('updateWithServerPosition', players[i]);
+            socket.emit('updateWithServerPosition', players[i]);
         }
     });
     
@@ -200,16 +203,18 @@ io.sockets.on('connection', function(socket){
     
     //Sends enemy positions to the players
     socket.on('sendEnemies', function(enemyArray){
-         console.log("Enemies length: " + enemies.length);
          if(enemies.length < 1)
             enemies = enemyArray;
+         if(enemies.length != enemyArray.length){
+            enemies.splice(0,enemies.length);
+            enemies = enemyArray;
+         }
          console.log("Enemies length: " + enemies.length);
          socket.emit('updateEnemyPositionWithServer', enemies);
          socket.emit('updateEnemyHealthWithServer', enemies);
-         io.sockets.emit('getServerPosition', players[0]);
-         io.sockets.emit('getServerPosition', players[1]);
-         io.sockets.emit('updateGameLevel', gameLevel);
-         console.log("Level : " + gameLevel);
+         socket.emit('getServerPosition', players[0]);
+         socket.emit('getServerPosition', players[1]);
+         socket.emit('updateGameLevel', gameLevel);
     });
     
     //Updates enemy positions
@@ -250,31 +255,34 @@ io.sockets.on('connection', function(socket){
     socket.on('changeServerLevel', function(level){
       if(level > gameLevel)
           gameLevel = level;
+      io.sockets.emit('goToLevel', gameLevel);
     });
     
     socket.on('resetGame', function(level){
+      io.sockets.emit('updateWithServerPosition', players[0]);
+      io.sockets.emit('updateWithServerPosition', players[1]);      
       gameLevel = level;
-      console.log("Level2 : " + gameLevel);
       players.splice(0,players.length);
-      var newPlayer = {
+      var Player = {
          player : 'black',
          position: {x: 100, y: 200,},
          direction: {velX: 0, velY: 0,},
          bullets: new Array(),
          health: 100,
+         facingDirection: {xVel: 0, yVel: 0,},
       };
-      players.push(newPlayer);
-      var newPlayer2 = {
+      players.push(Player);
+      var Player2 = {
          player : 'blue',
          position: {x: 300, y: 200,},
          direction: {velX: 0, velY: 0,},
          bullets: new Array(),
          health: 100,
+         facingDirection: {xVel: 0, yVel: 0,},
       };
-      players.push(newPlayer2);
-      
+      players.push(Player2);
       enemies.splice(0,enemies.length);
       enemies = new Array();
-      io.sockets.emit('restartGame');
+      io.sockets.emit('restartGame', gameLevel);
     });
 });

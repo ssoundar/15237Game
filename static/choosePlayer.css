@@ -63,6 +63,10 @@ img{
    display: none;
 }
 
+#faq{
+   display: none;
+}
+
 #blackButton{
    display:block;
    width: 90%;
@@ -125,7 +129,35 @@ img{
    color: #eee;
 }
 
+#faqButton{
+   display:block;
+   width: 90%;
+   height: 100px;
+   background-color: #DAA520;
+   padding: 10px;
+   text-align: center;
+   border-radius: 5px;
+   margin: 10px;
+   font-size: 25px;
+   font-weight: bold;
+   text-transform: uppercase;
+   color: #eee;
+}
 
+#backButton{
+   display:block;
+   width: 90%;
+   height: 100px;
+   background-color: #DAA520;
+   padding: 10px;
+   text-align: center;
+   border-radius: 5px;
+   margin: 10px;
+   font-size: 25px;
+   font-weight: bold;
+   text-transform: uppercase;
+   color: #eee;
+}
 /* Login Form Styling */
 form {
     margin:20px auto;
