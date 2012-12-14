@@ -43,9 +43,9 @@ function serveStaticFile(request, response) {
 
 app.get("/static/:staticFilename", serveStaticFile);
 var port = process.env.PORT||8889;
-/*app.listen(port, function(){
+app.listen(port, function(){
    console.log("Listening on " + port);
-});*/
+});
 
 process.on("uncaughtException", onUncaughtException);
 
@@ -139,7 +139,7 @@ var sessToPlayerType = {};
 
 // Initialize the socket.io library
 // Start the socket.io server on port 3000
-var io = require('socket.io').listen(port);
+var io = require('socket.io').listen(3000);
 io.set('log level', 1);
 // Listen for client connection event
 // io.sockets.* is the global, *all clients* socket

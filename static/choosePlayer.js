@@ -1,6 +1,6 @@
 //CHAGNETHIS: Address to server
-//var address = 'http://76.125.178.2:3000/';
-var address = 'http://128.237.255.59:3000/';
+var address = 'http://76.125.178.2:3000/';
+//var address = 'http://128.237.255.59:3000/';
 
 $(document).ready(function() {
    window.util.patchFnBind();

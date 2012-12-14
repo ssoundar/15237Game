@@ -3,8 +3,8 @@ This file contains all of the neccesary Objects to drive,
 and render the game. 
 *********************************************************/
 //CHAGNETHIS: Address to server
-//var address = 'http://76.125.178.2:3000/';
-var address = 'http://128.237.255.59:3000/';
+var address = 'http://76.125.178.2:3000/';
+//var address = 'http://128.237.255.59:3000/';
 
 /********************************************************
 These are mainly defines used to change static properties,
