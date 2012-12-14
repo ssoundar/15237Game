@@ -1,5 +1,26 @@
 Sid Soundararajan (ssoundar)
 
+To Run This Game, run the server using node server.js.
+
+Edit the following files:
+game.js + choosePlayer.js: change the address variable to point to server location.
+index.html : change line 7 to point to server location.
+
+Problems: Many browsers do not support Websockets yet, including Cordova, default android browsers,
+and firefox beta. Chrome is currently the only one I think implements it well. Due to this, the position
+of the other players, with respect to who ever is playing the game, will always be a stuttery. This is due 
+to the xhr-polling that is done in place of the sockets. I was not able to implement a solution that would
+ensure smoothness, while also keeping the position of the players relatively accurate.
+
+Design:
+I started with an initial game idea. I can the concept of having two controllers
+to control movement, and shooting, as well as the ego-centric camera. 
+I started by first implementing those three things, then I proceeded to implement a
+second player, and used websockets to synchronize them. Next I added enemies, and 
+synchonized them as well. After than I added bullets, and collision detection between
+all objects, and synchronized those events as well. At every stage, I tested the game
+with a friend to ensure the implementations worked.
+
 This project implements:
 1) Javascript: All of the enemies, and objects on the map are inherited from a base
          object, then specialized. (game.js: Look of everything after MapObjects)

@@ -776,7 +776,7 @@ Control.prototype.initControllerBackground = function(){
       this.enemies = new Array();
       if(level === 1){
         this.addEnemy(SIMPLE_CRAWLER, 600, 500);
-        /*this.addEnemy(SIMPLE_CRAWLER, 700, 500);
+        this.addEnemy(SIMPLE_CRAWLER, 700, 500);
         this.addEnemy(SIMPLE_CRAWLER, 500, 100);
         this.addEnemy(ADVANCED_CRAWLER, 600, 200);
         this.addEnemy(ANGRY_CRAWLER, 900, 200);
@@ -785,11 +785,11 @@ Control.prototype.initControllerBackground = function(){
         this.addEnemy(SIMPLE_CRAWLER, 1000, 500);
         this.addEnemy(ADVANCED_CRAWLER, 1100, 1800);
         this.addEnemy(ADVANCED_CRAWLER, 1200, 1900);
-        this.addEnemy(ANGRY_CRAWLER, 1300, 1600);*/
+        this.addEnemy(ANGRY_CRAWLER, 1300, 1600);
       }
       if(level === 2){
         this.addEnemy(SIMPLE_CRAWLER, 600, 600);
-        /*this.addEnemy(SIMPLE_CRAWLER, 700, 700);
+        this.addEnemy(SIMPLE_CRAWLER, 700, 700);
         this.addEnemy(SIMPLE_CRAWLER, 500, 800);
         this.addEnemy(ADVANCED_CRAWLER, 600, 900);
         this.addEnemy(ANGRY_CRAWLER, 300, 900);
@@ -801,7 +801,7 @@ Control.prototype.initControllerBackground = function(){
         this.addEnemy(ANGRY_CRAWLER, 600, 1400);
         
         this.addEnemy(ADVANCED_CRAWLER, 1100, 800);
-        this.addEnemy(ANGRY_CRAWLER, 1200, 200);*/
+        this.addEnemy(ANGRY_CRAWLER, 1200, 200);
       }
  }
  Map.prototype.drawObjects = function(x,y){
