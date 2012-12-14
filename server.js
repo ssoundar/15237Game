@@ -43,9 +43,9 @@ function serveStaticFile(request, response) {
 
 app.get("/static/:staticFilename", serveStaticFile);
 var port = process.env.PORT||8889;
-app.listen(port, function(){
+/*app.listen(port, function(){
    console.log("Listening on " + port);
-});
+});*/
 
 process.on("uncaughtException", onUncaughtException);
 
