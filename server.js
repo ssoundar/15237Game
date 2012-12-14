@@ -139,7 +139,7 @@ var sessToPlayerType = {};
 
 // Initialize the socket.io library
 // Start the socket.io server on port 3000
-var io = require('socket.io').listen(3000);
+var io = require('socket.io').listen(port);
 io.set('log level', 1);
 // Listen for client connection event
 // io.sockets.* is the global, *all clients* socket
