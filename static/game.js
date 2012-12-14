@@ -3,8 +3,8 @@ This file contains all of the neccesary Objects to drive,
 and render the game. 
 *********************************************************/
 //CHAGNETHIS: Address to server
-var address = 'http://76.125.178.2:3000/';
-//var address = 'http://128.237.238.78:3000/';
+//var address = 'http://76.125.178.2:3000/';
+var address = 'http://128.237.255.59:3000/';
 
 /********************************************************
 These are mainly defines used to change static properties,
@@ -167,7 +167,7 @@ Game.prototype.draw = function(timeDiff){
 }
 
 Game.prototype.clearPage = function(){
-    this.page.fillRect(0, 0, this.width, this.height, 'white');
+    this.page.fillRect(0, 0, this.width, this.height, 'black');
 }
 
 Game.prototype.drawBackground = function(){
